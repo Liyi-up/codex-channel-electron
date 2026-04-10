@@ -1,0 +1,21 @@
+{
+  "name": "codex-channel-electron",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Codex channel switch desktop app",
+  "main": "dist/main.js",
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build:ts": "tsc -p tsconfig.json",
+    "build:css": "tailwindcss -c tailwind.config.cjs -i ./src/renderer/tailwind.css -o ./dist/renderer/tailwind.css --minify",
+    "build:html": "cp ./src/renderer/index.html ./dist/renderer/index.html",
+    "build": "npm run clean && npm run build:ts && npm run build:css && npm run build:html",
+    "start": "npm run build && electron ."
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.16",
+    "electron": "^37.2.6",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.8.3"
+  }
+}

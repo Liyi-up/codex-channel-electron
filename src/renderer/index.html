@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>codex channel</title>
+  <link rel="stylesheet" href="./tailwind.css" />
+</head>
+<body class="app-bg min-h-screen text-textMain antialiased">
+  <main class="mx-auto min-h-screen w-full max-w-[1400px] px-5 py-6 md:px-8">
+    <header class="mb-5 flex items-end justify-between gap-3 border-b border-border/70 pb-4">
+      <div>
+        <p class="text-[11px] uppercase tracking-[0.24em] text-textSub">Desktop Utility</p>
+        <h1 class="mt-2 text-3xl font-semibold tracking-tight">codex channel</h1>
+        <p class="mt-2 text-sm text-textSub">通道切换与 FoxCode 页面集成工作台。</p>
+      </div>
+      <div class="rounded-xl border border-border/80 bg-white/[0.03] px-4 py-2 text-right">
+        <p class="text-[11px] uppercase tracking-[0.16em] text-textSub">Runtime</p>
+        <p class="mt-1 text-sm font-medium">Electron + TypeScript + Tailwind</p>
+      </div>
+    </header>
+
+    <section class="grid gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
+      <aside class="panel rounded-2xl border border-border/80 p-5">
+        <h2 class="text-base font-semibold">通道控制</h2>
+        <p class="mt-1 text-xs text-textSub">切换后会尝试刷新 Codex CLI / App 运行态。</p>
+
+        <section id="status" class="mt-4 flex flex-wrap gap-2"></section>
+
+        <section class="mt-4 grid gap-2">
+          <button id="btn-fox" data-label="切到 fox" class="btn btn-fox">
+            <span class="spinner hidden" aria-hidden="true"></span>
+            <span class="label">切到 fox</span>
+          </button>
+          <button id="btn-default" data-label="切到 default" class="btn btn-default">
+            <span class="spinner hidden" aria-hidden="true"></span>
+            <span class="label">切到 default</span>
+          </button>
+          <button id="btn-refresh" data-label="刷新状态" class="btn btn-neutral">
+            <span class="spinner hidden" aria-hidden="true"></span>
+            <span class="label">刷新状态</span>
+          </button>
+        </section>
+
+        <section class="mt-5 rounded-xl border border-rose-400/35 bg-rose-500/10 p-3">
+          <div class="mb-2 flex items-center justify-between gap-2">
+            <h3 class="text-xs font-semibold tracking-wide text-rose-300">危险操作</h3>
+            <p class="text-[11px] text-rose-200/85">先备份后清空</p>
+          </div>
+          <button id="btn-clear" data-label="一键删除当前 Codex 历史对话" class="btn btn-danger w-full">
+            <span class="spinner hidden" aria-hidden="true"></span>
+            <span class="label">一键删除当前 Codex 历史对话</span>
+          </button>
+          <p class="mt-2 text-[11px] leading-relaxed text-rose-100/85">
+            清空 <code class="inline-code">history.jsonl</code> / <code class="inline-code">session_index.jsonl</code> /
+            <code class="inline-code">sessions</code> / <code class="inline-code">archived_sessions</code>
+          </p>
+        </section>
+
+        <section class="mt-4 space-y-2">
+          <pre id="msg" class="log-box text-emerald-300"></pre>
+          <pre id="err" class="log-box text-rose-300"></pre>
+        </section>
+      </aside>
+
+      <section class="panel flex min-h-[680px] flex-col rounded-2xl border border-border/80 p-4">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div class="inline-flex rounded-lg border border-border/80 bg-black/20 p-1">
+            <button id="tab-dashboard" class="tab-btn tab-btn-active" data-tab="dashboard">foxcode dashboard</button>
+            <button id="tab-status" class="tab-btn" data-tab="status">foxcode status</button>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="remote-loading" class="hidden text-xs text-textSub">页面加载中...</span>
+            <button id="btn-remote-refresh" class="btn btn-neutral btn-sm" data-label="刷新页面">
+              <span class="spinner hidden" aria-hidden="true"></span>
+              <span class="label">刷新页面</span>
+            </button>
+            <button id="btn-open-external" class="btn btn-neutral btn-sm" data-label="浏览器打开">
+              <span class="label">浏览器打开</span>
+            </button>
+          </div>
+        </div>
+
+        <p id="remote-error" class="mb-2 hidden rounded-lg border border-rose-400/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-200"></p>
+
+        <div class="relative min-h-[560px] flex-1 overflow-hidden rounded-xl border border-border/80 bg-black/35">
+          <webview
+            id="view-dashboard"
+            class="remote-view"
+            src="https://foxcode.rjj.cc/dashboard"
+            allowpopups
+          ></webview>
+          <webview
+            id="view-status"
+            class="remote-view hidden"
+            src="https://status.rjj.cc/status/foxcode"
+            allowpopups
+          ></webview>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
