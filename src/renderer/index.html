@@ -6,28 +6,22 @@
   <title>codex channel</title>
   <link rel="stylesheet" href="./tailwind.css" />
 </head>
-<body class="app-bg min-h-screen text-textMain antialiased">
-  <main class="mx-auto min-h-screen w-full max-w-[1400px] px-5 py-6 md:px-8">
-    <header class="mb-5 flex items-end justify-between gap-3 border-b border-border/70 pb-4">
-      <div>
-        <p class="text-[11px] uppercase tracking-[0.24em] text-textSub">Desktop Utility</p>
-        <h1 class="mt-2 text-3xl font-semibold tracking-tight">codex channel</h1>
-        <p class="mt-2 text-sm text-textSub">通道切换与 FoxCode 页面集成工作台。</p>
-      </div>
-      <div class="rounded-xl border border-border/80 bg-white/[0.03] px-4 py-2 text-right">
-        <p class="text-[11px] uppercase tracking-[0.16em] text-textSub">Runtime</p>
-        <p class="mt-1 text-sm font-medium">Electron + TypeScript + Tailwind</p>
-      </div>
+<body class="app-bg h-screen overflow-hidden text-textMain antialiased">
+  <main class="mx-auto flex h-screen w-full max-w-7xl flex-col px-4 py-4">
+    <header class="mb-3 border-b border-border/70 pb-3">
+      <p class="text-[11px] uppercase tracking-[0.24em] text-textSub">Desktop Utility</p>
+      <h1 class="mt-1.5 text-[38px] font-semibold leading-none tracking-tight">codex channel</h1>
+      <p class="mt-1 text-xs text-textSub">仅展示 FoxCode 仪表板额度数据（按量额度 / 月卡额度）。</p>
     </header>
 
-    <section class="grid gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
-      <aside class="panel rounded-2xl border border-border/80 p-5">
+    <section class="grid min-h-0 flex-1 gap-4 lg:grid-cols-[332px_minmax(0,1fr)]">
+      <aside class="panel panel-scroll rounded-2xl border border-border/80 p-4">
         <h2 class="text-base font-semibold">通道控制</h2>
         <p class="mt-1 text-xs text-textSub">切换后会尝试刷新 Codex CLI / App 运行态。</p>
 
-        <section id="status" class="mt-4 flex flex-wrap gap-2"></section>
+        <section id="status" class="mt-3 flex flex-wrap gap-2"></section>
 
-        <section class="mt-4 grid gap-2">
+        <section class="mt-3 grid gap-2">
           <button id="btn-fox" data-label="切到 fox" class="btn btn-fox">
             <span class="spinner hidden" aria-hidden="true"></span>
             <span class="label">切到 fox</span>
@@ -42,7 +36,7 @@
           </button>
         </section>
 
-        <section class="mt-5 rounded-xl border border-rose-400/35 bg-rose-500/10 p-3">
+        <section class="mt-4 rounded-xl border border-rose-400/35 bg-rose-500/10 p-3">
           <div class="mb-2 flex items-center justify-between gap-2">
             <h3 class="text-xs font-semibold tracking-wide text-rose-300">危险操作</h3>
             <p class="text-[11px] text-rose-200/85">先备份后清空</p>
@@ -57,46 +51,69 @@
           </p>
         </section>
 
-        <section class="mt-4 space-y-2">
+        <section class="history-wrap mt-4 rounded-xl border border-border/80 bg-black/20 p-3">
+          <button id="history-toggle" type="button" class="history-summary" aria-expanded="false" aria-controls="history-content">
+            <span class="text-xs font-semibold tracking-wide text-textMain">历史会话</span>
+            <span class="history-summary-icon" aria-hidden="true">▾</span>
+          </button>
+          <div id="history-content" class="history-content">
+            <div class="history-content-inner">
+              <div class="mt-2 flex items-center justify-between gap-2">
+                <p id="history-meta" class="text-[11px] text-textSub">加载中...</p>
+                <button id="btn-history-refresh" data-label="刷新列表" class="btn btn-neutral !px-2.5 !py-1.5 !text-xs">
+                  <span class="spinner hidden" aria-hidden="true"></span>
+                  <span class="label">刷新列表</span>
+                </button>
+              </div>
+              <div id="history-list" class="history-list mt-2"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="mt-3 space-y-2">
           <pre id="msg" class="log-box text-emerald-300"></pre>
           <pre id="err" class="log-box text-rose-300"></pre>
         </section>
       </aside>
 
-      <section class="panel flex min-h-[680px] flex-col rounded-2xl border border-border/80 p-4">
-        <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <div class="inline-flex rounded-lg border border-border/80 bg-black/20 p-1">
-            <button id="tab-dashboard" class="tab-btn tab-btn-active" data-tab="dashboard">foxcode dashboard</button>
-            <button id="tab-status" class="tab-btn" data-tab="status">foxcode status</button>
+      <section class="panel panel-scroll rounded-2xl border border-border/80 p-4">
+        <div class="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h2 class="text-base font-semibold">FoxCode 额度</h2>
+            <p class="mt-1 text-xs text-textSub">登录后基于 Cookie 自动拉取额度接口数据。</p>
           </div>
           <div class="flex items-center gap-2">
-            <span id="remote-loading" class="hidden text-xs text-textSub">页面加载中...</span>
-            <button id="btn-remote-refresh" class="btn btn-neutral btn-sm" data-label="刷新页面">
+            <button id="btn-fox-login" data-label="打开登录页" class="btn btn-default">
               <span class="spinner hidden" aria-hidden="true"></span>
-              <span class="label">刷新页面</span>
+              <span class="label">打开登录页</span>
             </button>
-            <button id="btn-open-external" class="btn btn-neutral btn-sm" data-label="浏览器打开">
-              <span class="label">浏览器打开</span>
+            <button id="btn-quota-fetch" data-label="获取额度" class="btn btn-neutral">
+              <span class="spinner hidden" aria-hidden="true"></span>
+              <span class="label">获取额度</span>
             </button>
           </div>
         </div>
 
-        <p id="remote-error" class="mb-2 hidden rounded-lg border border-rose-400/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-200"></p>
+        <p id="env-hint" class="mb-3 rounded-lg border border-border/70 bg-black/25 px-3 py-2 text-xs text-textSub">
+          第一步点击“打开登录页”完成登录；第二步回到本应用点击“获取额度”。
+        </p>
 
-        <div class="relative min-h-[560px] flex-1 overflow-hidden rounded-xl border border-border/80 bg-black/35">
-          <webview
-            id="view-dashboard"
-            class="remote-view"
-            src="https://foxcode.rjj.cc/dashboard"
-            allowpopups
-          ></webview>
-          <webview
-            id="view-status"
-            class="remote-view hidden"
-            src="https://status.rjj.cc/status/foxcode"
-            allowpopups
-          ></webview>
-        </div>
+        <section class="mt-4 grid gap-3 sm:grid-cols-2">
+          <article class="quota-card quota-card-total">
+            <p class="quota-title">按量额度</p>
+            <p id="quota-total" class="quota-value">--</p>
+          </article>
+          <article class="quota-card quota-card-month">
+            <p class="quota-title">月卡额度</p>
+            <p id="quota-month" class="quota-value">--</p>
+          </article>
+        </section>
+
+        <section class="mt-4 rounded-xl border border-border/80 bg-black/20 p-3 text-xs text-textSub">
+          <p>账号：<span id="quota-user">--</span></p>
+          <p class="mt-1">更新时间：<span id="quota-updated">--</span></p>
+          <p id="quota-meta" class="mt-1"></p>
+        </section>
       </section>
     </section>
   </main>
