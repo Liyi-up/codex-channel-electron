@@ -15,10 +15,45 @@
     "dev:electron": "wait-on tcp:5173 file:dist/main.js file:dist/preload.js && nodemon --watch dist/main.js --watch dist/preload.js --ext js --exec \"npm run dev:electron:run\"",
     "dev": "npm run clean && concurrently -k -n MAIN,RENDERER,ELECTRON -c yellow,cyan,green \"npm:dev:main\" \"npm:dev:renderer\" \"npm:dev:electron\"",
     "start": "npm run build && electron .",
+    "pack": "npm run build && electron-builder --dir",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:linux": "npm run build && electron-builder --linux",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier . --write",
     "format:check": "prettier . --check"
+  },
+  "build": {
+    "appId": "com.codex.channel.electron",
+    "productName": "codex channel",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "tar.gz"
+      ]
+    }
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
@@ -30,6 +65,7 @@
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
     "electron": "^37.2.6",
+    "electron-builder": "^26.8.1",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.0.1",

@@ -9,7 +9,10 @@ Electron 桌面工具（Electron + React + Vite + React Query + Zustand + Tailwi
 
 ## 用户安装与启动
 
-当前仓库**没有提供 DMG/PKG 安装包**，请按“源码运行”方式使用。
+支持两种方式：
+
+- 源码运行（开发调试）
+- 打包成平台应用（安装包/可执行目录）
 
 ### 1) 环境要求
 
@@ -52,6 +55,49 @@ npm start
 
 `npm start` 会先执行构建，再启动 Electron 桌面应用。
 
+## 从 Clone 到平台 App（打包）
+
+### 1) 克隆仓库
+
+```bash
+git clone <你的仓库地址>
+cd codex-channel-electron
+```
+
+### 2) 安装依赖
+
+```bash
+npm install
+```
+
+### 3) 先确保运行配置已准备（必需）
+
+请先按上方“准备 Codex 配置文件”章节放置 `~/.codex` 下的配置模板。
+
+### 4) 生成当前平台的应用产物
+
+```bash
+# 生成当前平台的解包目录（用于快速验证）
+npm run pack
+
+# macOS 产物（dmg + zip）
+npm run dist:mac
+
+# Windows 产物（nsis + zip）
+npm run dist:win
+
+# Linux 产物（AppImage + tar.gz）
+npm run dist:linux
+```
+
+### 5) 查看产物目录
+
+所有打包输出都在：
+
+```bash
+release/
+```
+
 ## 使用说明
 
 1. 启动后点击通道按钮（`default` 或 `fox`）进行切换。
@@ -71,6 +117,7 @@ npm start
 - 本工具当前固定支持 `default` 与 `fox` 两个通道模板命名。
 - 若缺少上述必要文件，切换时会报错“缺少必要文件”。
 - 仅当本机存在 `/Applications/Codex.app` 时，才会尝试自动重启 Codex App。
+- 跨平台打包建议在对应平台本机执行（例如 mac 产物在 macOS 上打包）。
 
 ## FoxCode 额度说明
 
