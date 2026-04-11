@@ -104,10 +104,54 @@ function readBufferSafe(filePath: string): Buffer | null {
   }
 }
 
+function readTextSafe(filePath: string): string | null {
+  try {
+    return fs.readFileSync(filePath, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
+function normalizeConfigForChannelCompare(content: string): string {
+  const lines = content.replace(/\r\n/g, '\n').split('\n');
+  const kept: string[] = [];
+  let skippingProjectsSection = false;
+
+  for (const rawLine of lines) {
+    const line = rawLine.replace(/\s+$/g, '');
+    const trimmed = line.trim();
+    const isTable = /^\s*\[[^\]]+\]\s*$/.test(trimmed);
+
+    if (/^\s*\[projects\.".*"\]\s*$/.test(trimmed)) {
+      skippingProjectsSection = true;
+      continue;
+    }
+
+    if (isTable && skippingProjectsSection) {
+      skippingProjectsSection = false;
+    }
+
+    if (skippingProjectsSection) continue;
+    kept.push(line);
+  }
+
+  return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function sameFile(a: string, b: string): boolean {
   const aBuffer = readBufferSafe(a);
   const bBuffer = readBufferSafe(b);
   return !!aBuffer && !!bBuffer && aBuffer.equals(bBuffer);
+}
+
+function sameConfigFile(a: string, b: string): boolean {
+  if (sameFile(a, b)) return true;
+
+  const aText = readTextSafe(a);
+  const bText = readTextSafe(b);
+  if (aText === null || bText === null) return false;
+
+  return normalizeConfigForChannelCompare(aText) === normalizeConfigForChannelCompare(bText);
 }
 
 function ensureRequired(): void {
@@ -130,8 +174,8 @@ function getState(): ChannelState {
   let configMatch: ChannelState['configMatch'] = 'unknown';
   let authMatch: ChannelState['authMatch'] = 'unknown';
 
-  if (sameFile(CONFIG_TARGET, CHANNEL_FILES.default.config)) configMatch = 'default';
-  if (sameFile(CONFIG_TARGET, CHANNEL_FILES.fox.config)) configMatch = 'fox';
+  if (sameConfigFile(CONFIG_TARGET, CHANNEL_FILES.default.config)) configMatch = 'default';
+  if (sameConfigFile(CONFIG_TARGET, CHANNEL_FILES.fox.config)) configMatch = 'fox';
 
   if (sameFile(AUTH_TARGET, CHANNEL_FILES.default.auth)) authMatch = 'default';
   if (sameFile(AUTH_TARGET, CHANNEL_FILES.fox.auth)) authMatch = 'fox';
