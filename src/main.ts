@@ -135,7 +135,10 @@ function normalizeConfigForChannelCompare(content: string): string {
     kept.push(line);
   }
 
-  return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  return kept
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 function sameFile(a: string, b: string): boolean {
@@ -180,7 +183,8 @@ function getState(): ChannelState {
   if (sameFile(AUTH_TARGET, CHANNEL_FILES.default.auth)) authMatch = 'default';
   if (sameFile(AUTH_TARGET, CHANNEL_FILES.fox.auth)) authMatch = 'fox';
 
-  const current: ChannelState['current'] = configMatch === authMatch && configMatch !== 'unknown' ? configMatch : 'mixed';
+  const current: ChannelState['current'] =
+    configMatch === authMatch && configMatch !== 'unknown' ? configMatch : 'mixed';
 
   return { current, configMatch, authMatch };
 }
@@ -279,7 +283,10 @@ function clearHistory(): ClearHistoryResult {
   const errors: string[] = [];
 
   const backupRoot = path.join(BASE_DIR, '.history-backups');
-  const stamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
+  const stamp = new Date()
+    .toISOString()
+    .replace(/[-:TZ.]/g, '')
+    .slice(0, 14);
   const backupDir = path.join(backupRoot, stamp);
   ensureDir(backupDir);
 
@@ -647,7 +654,11 @@ async function waitForDashboardQuota(win: BrowserWindow, waitMs = 5000, interval
   return latest;
 }
 
-async function loadUrlWithTimeout(win: BrowserWindow, url: string, timeoutMs: number): Promise<{ timedOut: boolean; error?: string }> {
+async function loadUrlWithTimeout(
+  win: BrowserWindow,
+  url: string,
+  timeoutMs: number
+): Promise<{ timedOut: boolean; error?: string }> {
   const loadPromise = win
     .loadURL(url)
     .then(() => ({ timedOut: false }))
@@ -758,7 +769,12 @@ type QuotaCandidate = {
   score: number;
 };
 
-function pickBestQuotaCandidate(current: QuotaCandidate | null, key: string, value: unknown, scope: 'month' | 'total'): QuotaCandidate | null {
+function pickBestQuotaCandidate(
+  current: QuotaCandidate | null,
+  key: string,
+  value: unknown,
+  scope: 'month' | 'total'
+): QuotaCandidate | null {
   const normalized = normalizeQuotaValue(value);
   if (!normalized) return current;
 
@@ -766,8 +782,10 @@ function pickBestQuotaCandidate(current: QuotaCandidate | null, key: string, val
   const hasNegativeSignal = /(used|usage|consume|spent|cost|deduct|已用|消耗|消费)/i.test(key);
   if (hasNegativeSignal) return current;
 
-  const positiveMonth = /(month.*(remaining|available|balance)|monthly.*(remaining|available|balance)|month[_-]?card.*(remaining|available|balance)|月卡.*(剩余|余额|额度)|月度.*(剩余|余额|额度))/i;
-  const positiveTotal = /(remaining|available|balance|left|credit|quota_remaining|quota_balance|按量.*(剩余|余额|额度)|可用额度)/i;
+  const positiveMonth =
+    /(month.*(remaining|available|balance)|monthly.*(remaining|available|balance)|month[_-]?card.*(remaining|available|balance)|月卡.*(剩余|余额|额度)|月度.*(剩余|余额|额度))/i;
+  const positiveTotal =
+    /(remaining|available|balance|left|credit|quota_remaining|quota_balance|按量.*(剩余|余额|额度)|可用额度)/i;
 
   let score = 0;
   if (scope === 'month') {
@@ -866,7 +884,9 @@ function scoreQuotaResponse(url: string, data: FoxcodeQuotaData): number {
   return score;
 }
 
-function parseQuotaFromApiResponses(responses: CapturedApiResponse[]): { data: FoxcodeQuotaData; apiEndpoint: string } | null {
+function parseQuotaFromApiResponses(
+  responses: CapturedApiResponse[]
+): { data: FoxcodeQuotaData; apiEndpoint: string } | null {
   let best: { data: FoxcodeQuotaData; apiEndpoint: string; score: number } | null = null;
 
   for (const response of responses) {
@@ -979,7 +999,7 @@ async function fetchFoxcodeQuota(): Promise<FoxcodeQuotaResult> {
       ok: false,
       requiresLogin: true,
       hasCookie: loginState.hasCookie,
-      message: '未检测到有效登录态，请点击“打开登录页”重新登录后再获取额度。'
+      message: '请先完成登录后再获取额度。'
     };
   }
 
@@ -1006,7 +1026,7 @@ async function fetchFoxcodeQuota(): Promise<FoxcodeQuotaResult> {
         ok: false,
         requiresLogin: true,
         hasCookie: true,
-        message: 'Cookie 已失效或登录态过期，请重新登录后再获取额度。'
+        message: '登录状态已失效，请重新登录后再获取额度。'
       };
     }
 
@@ -1015,7 +1035,7 @@ async function fetchFoxcodeQuota(): Promise<FoxcodeQuotaResult> {
         ok: true,
         requiresLogin: false,
         hasCookie: true,
-        message: '未捕获到可用额度接口，已通过 Cookie 访问 dashboard 并解析额度。',
+        message: '额度已更新。',
         data: {
           totalQuota: shot.totalQuota,
           monthQuota: shot.monthQuota || '0',
@@ -1024,18 +1044,14 @@ async function fetchFoxcodeQuota(): Promise<FoxcodeQuotaResult> {
       };
     }
 
-    const responses = await withTimeout(
-      captureApiResponses(hiddenWindow),
-      7000,
-      '额度接口抓取超时'
-    );
+    const responses = await withTimeout(captureApiResponses(hiddenWindow), 7000, '额度接口抓取超时');
     const parsedByApi = parseQuotaFromApiResponses(responses);
     if (parsedByApi) {
       return {
         ok: true,
         requiresLogin: false,
         hasCookie: true,
-        message: '已通过登录 Cookie 拉取额度接口并更新数据。',
+        message: '额度已更新。',
         apiEndpoint: parsedByApi.apiEndpoint,
         data: parsedByApi.data
       };
@@ -1046,7 +1062,7 @@ async function fetchFoxcodeQuota(): Promise<FoxcodeQuotaResult> {
         ok: true,
         requiresLogin: false,
         hasCookie: true,
-        message: '额度接口未命中，已回退到 dashboard 文本解析结果。',
+        message: '额度已更新。',
         data: {
           totalQuota: shot.totalQuota,
           monthQuota: shot.monthQuota || '0',
@@ -1059,14 +1075,14 @@ async function fetchFoxcodeQuota(): Promise<FoxcodeQuotaResult> {
       ok: false,
       requiresLogin: false,
       hasCookie: true,
-      message: '已登录但未获取到额度数据，请刷新页面后重试。'
+      message: '暂未获取到额度数据，请稍后重试。'
     };
-  } catch (err) {
+  } catch {
     return {
       ok: false,
       requiresLogin: false,
       hasCookie: true,
-      message: `读取额度失败: ${(err as Error).message}`
+      message: '获取额度失败，请稍后重试。'
     };
   } finally {
     if (!hiddenWindow.isDestroyed()) {
@@ -1077,7 +1093,7 @@ async function fetchFoxcodeQuota(): Promise<FoxcodeQuotaResult> {
 
 let windowRef: BrowserWindow | null = null;
 
-function createWindow(): void {
+async function createWindow(): Promise<void> {
   windowRef = new BrowserWindow({
     width: 900,
     height: 680,
@@ -1093,7 +1109,14 @@ function createWindow(): void {
   });
 
   windowRef.removeMenu();
-  windowRef.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+
+  const rendererDevUrl = process.env.ELECTRON_RENDERER_URL;
+  if (rendererDevUrl) {
+    await windowRef.loadURL(rendererDevUrl);
+    return;
+  }
+
+  await windowRef.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 }
 
 ipcMain.handle('state:get', async (): Promise<ChannelState> => getState());
@@ -1120,10 +1143,10 @@ ipcMain.handle('foxcode:login-state', async (): Promise<FoxcodeLoginState> => re
 ipcMain.handle('foxcode:fetch-quota', async (): Promise<FoxcodeQuotaResult> => fetchFoxcodeQuota());
 
 app.whenReady().then(() => {
-  createWindow();
+  void createWindow();
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) void createWindow();
   });
 });
 

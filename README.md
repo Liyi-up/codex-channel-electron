@@ -1,6 +1,6 @@
 # codex channel
 
-Electron 桌面工具（TypeScript + Tailwind CSS），提供以下能力：
+Electron 桌面工具（Electron + React + Vite + React Query + Zustand + Tailwind CSS），提供以下能力：
 
 - 一键切换 Codex 通道（`fox` / `default`）
 - 切换后尝试刷新 Codex 运行态（CLI / App）
@@ -14,7 +14,7 @@ Electron 桌面工具（TypeScript + Tailwind CSS），提供以下能力：
 ### 1) 环境要求
 
 - macOS（项目内含 `osascript`、`open -a Codex` 等 macOS 命令）
-- Node.js 18+（建议 20+）
+- Node.js 20+（Vite 8 需要）
 - npm
 
 ### 2) 准备 Codex 配置文件
@@ -32,6 +32,7 @@ Electron 桌面工具（TypeScript + Tailwind CSS），提供以下能力：
 其中 `<channel>` 必须一致，表示同一个通道名。
 
 例如：
+
 - `config-default.toml` + `auth-default.json`
 - `config-fox.toml` + `auth-fox.json`
 
@@ -81,12 +82,33 @@ npm start
 ## 开发
 
 ```bash
-npm run build
-electron .
+npm run dev
+```
+
+`npm run dev` 会并行启动：
+
+- `tsc --watch`（主进程与 preload）
+- `vite`（渲染层开发服务器）
+- `electron + nodemon`（自动连接 Vite；`main/preload` 变更后自动重启）
+
+热更新行为说明：
+
+- 修改 `src/renderer/**`：Vite HMR（热模块替换）即时生效，无需重启窗口。
+- 修改 `src/main.ts` / `src/preload.ts`：`tsc` 产物更新后，`nodemon` 自动重启 Electron 进程。
+
+如需生产构建后启动：
+
+```bash
+npm start
 ```
 
 ## 目录
 
 - `src/main.ts`：Electron 主进程
 - `src/preload.ts`：安全桥接 API
-- `src/renderer/`：渲染层 UI 与交互
+- `src/renderer/main.tsx`：React 渲染入口
+- `src/renderer/App.tsx`：页面骨架编排
+- `src/renderer/query/`：基于 React Query 的异步请求管理
+- `src/renderer/store/useCodexStore.ts`：基于 Zustand 的 UI 状态与动作
+- `src/renderer/components/`：渲染层组件
+- `vite.config.ts`：Vite 构建配置

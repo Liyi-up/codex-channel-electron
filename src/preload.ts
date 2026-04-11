@@ -68,7 +68,8 @@ const api = {
   switchChannel: (channel: Channel): Promise<SwitchResult> => ipcRenderer.invoke('channel:switch', channel),
   clearHistory: (): Promise<ClearHistoryResult> => ipcRenderer.invoke('history:clear'),
   listHistory: (): Promise<HistoryListResult> => ipcRenderer.invoke('history:list'),
-  deleteHistoryOne: (sessionId: string): Promise<DeleteHistoryOneResult> => ipcRenderer.invoke('history:delete-one', sessionId),
+  deleteHistoryOne: (sessionId: string): Promise<DeleteHistoryOneResult> =>
+    ipcRenderer.invoke('history:delete-one', sessionId),
   openFoxcodeLogin: (): Promise<FoxcodeOpenLoginResult> => ipcRenderer.invoke('foxcode:open-login'),
   getFoxcodeLoginState: (): Promise<FoxcodeLoginState> => ipcRenderer.invoke('foxcode:login-state'),
   fetchFoxcodeQuota: (): Promise<FoxcodeQuotaResult> => ipcRenderer.invoke('foxcode:fetch-quota')

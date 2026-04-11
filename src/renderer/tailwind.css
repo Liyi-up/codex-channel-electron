@@ -89,7 +89,7 @@
   }
 
   .log-box {
-    @apply max-h-20 min-h-0 overflow-y-auto rounded-lg border border-border/70 bg-black/25 p-2 text-xs leading-relaxed whitespace-pre-wrap;
+    @apply max-h-56 min-h-[120px] overflow-y-auto rounded-lg border border-border/70 bg-black/25 p-2 text-xs leading-relaxed;
   }
 
   .history-summary {
@@ -101,7 +101,10 @@
     overflow: hidden;
     opacity: 0;
     transform: translateY(-4px);
-    transition: max-height 260ms cubic-bezier(0.2, 0.7, 0.2, 1), opacity 180ms ease, transform 220ms ease;
+    transition:
+      max-height 260ms cubic-bezier(0.2, 0.7, 0.2, 1),
+      opacity 180ms ease,
+      transform 220ms ease;
     will-change: max-height, opacity, transform;
   }
 
@@ -111,6 +114,7 @@
   }
 
   .history-content.is-open {
+    max-height: 700px;
     opacity: 1;
     transform: translateY(0);
   }
@@ -129,7 +133,7 @@
   }
 
   .history-list {
-    @apply max-h-44 space-y-1.5 overflow-y-auto pr-1;
+    @apply max-h-72 space-y-1.5 overflow-y-auto pr-1;
   }
 
   .history-item {

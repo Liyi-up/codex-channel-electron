@@ -6,19 +6,49 @@
   "main": "dist/main.js",
   "scripts": {
     "clean": "rm -rf dist",
-    "build:ts": "tsc -p tsconfig.json",
-    "build:css": "tailwindcss -c tailwind.config.cjs -i ./src/renderer/tailwind.css -o ./dist/renderer/tailwind.css --minify",
-    "build:html": "cp ./src/renderer/index.html ./dist/renderer/index.html",
-    "build": "npm run clean && npm run build:ts && npm run build:css && npm run build:html",
-    "start": "npm run build && electron ."
+    "build:main": "tsc -p tsconfig.json",
+    "build:renderer": "vite build --config vite.config.ts",
+    "build": "npm run clean && npm run build:main && npm run build:renderer",
+    "dev:main": "tsc -p tsconfig.json --watch --preserveWatchOutput",
+    "dev:renderer": "vite --config vite.config.ts --host 127.0.0.1 --port 5173",
+    "dev:electron:run": "cross-env ELECTRON_RENDERER_URL=http://127.0.0.1:5173 electron .",
+    "dev:electron": "wait-on tcp:5173 file:dist/main.js file:dist/preload.js && nodemon --watch dist/main.js --watch dist/preload.js --ext js --exec \"npm run dev:electron:run\"",
+    "dev": "npm run clean && concurrently -k -n MAIN,RENDERER,ELECTRON -c yellow,cyan,green \"npm:dev:main\" \"npm:dev:renderer\" \"npm:dev:electron\"",
+    "start": "npm run build && electron .",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.1",
     "@types/node": "^22.15.16",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "autoprefixer": "^10.4.27",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
     "electron": "^37.2.6",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "nodemon": "^3.1.14",
+    "postcss": "^8.5.9",
+    "prettier": "^3.6.2",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.46.1",
+    "vite": "^8.0.8",
+    "wait-on": "^9.0.5"
   },
   "dependencies": {
-    "dotenv": "^16.6.1"
+    "@tanstack/react-query": "^5.97.0",
+    "dotenv": "^16.6.1",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "zustand": "^5.0.12"
   }
 }
