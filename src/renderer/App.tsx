@@ -6,60 +6,47 @@ import QuotaPanel from './components/QuotaPanel';
 import { Button } from './components/ui/button';
 import {
   useChannelStateQuery,
-  useFoxcodeLoginStateQuery,
-  useFoxcodeQuotaQuery,
+  useFoxCodeLoginStateQuery,
+  useFoxCodeQuotaQuery,
+  useFoxCodeStatusQuery,
   useHistoryQuery
 } from './query/codexQueries';
-import { buildLoginHint, makeQuotaMeta } from './store/codexStore.helpers';
+import { buildLoginHint } from './store/codexStore.helpers';
 import useCodexStore from './store/useCodexStore';
-import { formatUpdatedAt } from './utils';
-
-type ThemeMode = 'dark' | 'light';
-
-const THEME_STORAGE_KEY = 'codex-channel-theme';
-
-function readInitialTheme(): ThemeMode {
-  const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
-  return saved === 'light' ? 'light' : 'dark';
-}
+import { useThemeMode } from './hooks/useThemeMode';
+import { buildFoxCodexStatusView, buildQuotaView } from './view-models/foxCodeViewMappers';
 
 function App() {
   const {
-    message,
-    error,
-    historyExpanded,
     actionLocked,
     isBusy: storeIsBusy,
-    setHistoryExpanded,
     setFeedback,
     switchChannel,
     clearHistory,
     deleteHistoryOne,
-    openFoxcodeLogin
+    openFoxCodeLogin
   } = useCodexStore(
     useShallow((store) => ({
-      message: store.message,
-      error: store.error,
-      historyExpanded: store.historyExpanded,
       actionLocked: store.actionLocked,
       isBusy: store.isBusy,
-      setHistoryExpanded: store.setHistoryExpanded,
       setFeedback: store.setFeedback,
       switchChannel: store.switchChannel,
       clearHistory: store.clearHistory,
       deleteHistoryOne: store.deleteHistoryOne,
-      openFoxcodeLogin: store.openFoxcodeLogin
+      openFoxCodeLogin: store.openFoxCodeLogin
     }))
   );
 
   const startupLoginPromptedRef = useRef(false);
   const lastLoginAuthenticatedRef = useRef(false);
-  const [theme, setTheme] = useState<ThemeMode>(readInitialTheme);
+  const { theme, toggleTheme } = useThemeMode();
+  const [historyRefreshing, setHistoryRefreshing] = useState(false);
 
   const stateQuery = useChannelStateQuery();
   const historyQuery = useHistoryQuery();
-  const loginStateQuery = useFoxcodeLoginStateQuery();
-  const quotaQuery = useFoxcodeQuotaQuery();
+  const loginStateQuery = useFoxCodeLoginStateQuery();
+  const quotaQuery = useFoxCodeQuotaQuery(loginStateQuery.data?.isAuthenticated ?? false);
+  const foxcodeStatusQuery = useFoxCodeStatusQuery();
 
   const channelState = stateQuery.data ?? null;
 
@@ -88,39 +75,49 @@ function App() {
     };
   }, [loginStateQuery.data, loginStateQuery.isError]);
 
-  const quotaView = useMemo(() => {
-    if (!quotaQuery.data?.data) {
-      return {
-        total: '--',
-        month: '--',
-        username: '--',
-        updatedAt: '--',
-        meta: quotaQuery.data ? makeQuotaMeta(quotaQuery.data) : ''
-      };
-    }
+  const quotaView = useMemo(() => buildQuotaView(quotaQuery.data, quotaQuery.dataUpdatedAt), [quotaQuery.data, quotaQuery.dataUpdatedAt]);
 
-    return {
-      total: quotaQuery.data.data.totalQuota,
-      month: quotaQuery.data.data.monthQuota,
-      username: quotaQuery.data.data.username,
-      updatedAt: quotaQuery.dataUpdatedAt ? formatUpdatedAt(new Date(quotaQuery.dataUpdatedAt).toISOString()) : '--',
-      meta: makeQuotaMeta(quotaQuery.data)
-    };
-  }, [quotaQuery.data, quotaQuery.dataUpdatedAt]);
+  const foxCodexStatusView = useMemo(
+    () =>
+      buildFoxCodexStatusView({
+        result: foxcodeStatusQuery.data,
+        isPending: foxcodeStatusQuery.isPending,
+        isError: foxcodeStatusQuery.isError,
+        errorMessage: foxcodeStatusQuery.error?.message
+      }),
+    [foxcodeStatusQuery.data, foxcodeStatusQuery.error?.message, foxcodeStatusQuery.isError, foxcodeStatusQuery.isPending]
+  );
 
   const isBusy = (key: string): boolean => {
-    if (key === 'history') return historyQuery.isFetching;
+    if (key === 'history') return historyRefreshing || historyQuery.isFetching;
     if (key === 'quota') return quotaQuery.isFetching;
+    if (key === 'foxcode-status') return foxcodeStatusQuery.isFetching;
     return storeIsBusy(key);
   };
 
   const refreshHistory = useCallback(async (): Promise<void> => {
-    const result = await historyQuery.refetch();
+    if (historyRefreshing) return;
+    setHistoryRefreshing(true);
+    setFeedback('正在刷新历史会话...');
+    const start = Date.now();
 
-    if (result.error) {
-      setFeedback('', `读取历史会话失败: ${result.error.message || String(result.error)}`);
+    try {
+      const result = await historyQuery.refetch();
+      const remaining = 350 - (Date.now() - start);
+      if (remaining > 0) {
+        await new Promise((resolve) => setTimeout(resolve, remaining));
+      }
+
+      if (result.error) {
+        setFeedback('', `读取历史会话失败: ${result.error.message || String(result.error)}`);
+        return;
+      }
+
+      setFeedback('历史会话已刷新。');
+    } finally {
+      setHistoryRefreshing(false);
     }
-  }, [historyQuery, setFeedback]);
+  }, [historyQuery, historyRefreshing, setFeedback]);
 
   const fetchQuota = useCallback(
     async (silent: boolean): Promise<void> => {
@@ -129,6 +126,7 @@ function App() {
       }
 
       const result = await quotaQuery.refetch();
+      void foxcodeStatusQuery.refetch();
       if (result.error) {
         if (!silent) {
           setFeedback('', `获取额度失败: ${result.error.message || String(result.error)}`);
@@ -151,8 +149,29 @@ function App() {
         }
       }
     },
-    [quotaQuery, setFeedback]
+    [foxcodeStatusQuery, quotaQuery, setFeedback]
   );
+
+  const refreshFoxCodeStatus = useCallback(async (): Promise<void> => {
+    setFeedback('正在刷新状态...');
+    const result = await foxcodeStatusQuery.refetch();
+    if (result.error) {
+      setFeedback('', `刷新状态失败: ${result.error.message || String(result.error)}`);
+      return;
+    }
+
+    if (!result.data) {
+      setFeedback('', '刷新状态失败: 未获取到返回结果');
+      return;
+    }
+
+    if (result.data.ok) {
+      setFeedback(result.data.message, '');
+      return;
+    }
+
+    setFeedback('', result.data.message);
+  }, [foxcodeStatusQuery, setFeedback]);
 
   useEffect(() => {
     const loginState = loginStateQuery.data;
@@ -171,18 +190,9 @@ function App() {
 
     const needLoginNow = window.confirm('检测到未登录 FoxCode，是否现在打开登录页完成登录并自动拉取额度？');
     if (needLoginNow) {
-      void openFoxcodeLogin();
+      void openFoxCodeLogin();
     }
-  }, [fetchQuota, loginStateQuery.data, openFoxcodeLogin]);
-
-  useEffect(() => {
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-    document.documentElement.style.colorScheme = theme;
-  }, [theme]);
-
-  const toggleTheme = useCallback(() => {
-    setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
-  }, []);
+  }, [fetchQuota, loginStateQuery.data, openFoxCodeLogin]);
 
   return (
     <div className={`theme-root theme-${theme} app-bg h-screen overflow-hidden text-textMain antialiased`}>
@@ -191,8 +201,7 @@ function App() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-[11px] uppercase tracking-[0.24em] text-textSub">Desktop Utility</p>
-              <h1 className="mt-1.5 text-[38px] font-semibold leading-none tracking-tight">codex channel</h1>
-              <p className="mt-1 text-xs text-textSub">仅展示 FoxCode 仪表板额度数据（按量额度 / 月卡额度）。</p>
+              <h1 className="mt-1.5 text-[38px] font-semibold leading-none tracking-tight">Codex Channel</h1>
             </div>
             <Button
               type="button"
@@ -211,15 +220,10 @@ function App() {
         <section className="grid min-h-0 flex-1 grid-rows-2 gap-4 pb-2 lg:grid-cols-[332px_minmax(0,1fr)] lg:grid-rows-1 lg:pb-0">
           <ChannelPanel
             state={channelState}
-            message={message}
-            error={error}
             history={history}
             historyMeta={historyMeta}
-            historyExpanded={historyExpanded}
-            theme={theme}
             actionLocked={actionLocked}
             isBusy={isBusy}
-            onToggleHistory={() => setHistoryExpanded(!historyExpanded)}
             onSwitchChannel={(channel) => void switchChannel(channel)}
             onClearHistory={() => void clearHistory()}
             onRefreshHistory={() => void refreshHistory()}
@@ -230,9 +234,11 @@ function App() {
             envHint={loginHint.envHint}
             showFoxLogin={loginHint.showFoxLogin}
             quota={quotaView}
+            foxCodexStatus={foxCodexStatusView}
             isBusy={isBusy}
-            onOpenFoxLogin={() => void openFoxcodeLogin()}
+            onOpenFoxLogin={() => void openFoxCodeLogin()}
             onFetchQuota={() => void fetchQuota(false)}
+            onRefreshStatus={() => void refreshFoxCodeStatus()}
           />
         </section>
       </main>

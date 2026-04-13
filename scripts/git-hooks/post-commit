@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+set -u
+
+# 本开关用于临时跳过自动桌面部署：
+#   SKIP_AUTO_DESKTOP_DEPLOY=1 git commit -m "..."
+if [[ "${SKIP_AUTO_DESKTOP_DEPLOY:-0}" == "1" ]]; then
+  exit 0
+fi
+
+if [[ "$(uname -s 2>/dev/null || echo unknown)" != "Darwin" ]]; then
+  exit 0
+fi
+
+ROOT_DIR="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+if [[ -z "$ROOT_DIR" ]]; then
+  exit 0
+fi
+
+if ! command -v npm >/dev/null 2>&1; then
+  echo "[auto-deploy] 未找到 npm，跳过自动桌面部署。" >&2
+  exit 0
+fi
+
+echo "[auto-deploy] 检测到 commit，开始打包并替换桌面应用..."
+if npm --prefix "$ROOT_DIR" run build:deploy:desktop; then
+  echo "[auto-deploy] 桌面应用替换完成。"
+else
+  echo "[auto-deploy] 自动桌面部署失败（commit 已完成，不受影响）。" >&2
+fi
+
+exit 0

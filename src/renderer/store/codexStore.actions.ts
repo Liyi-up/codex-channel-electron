@@ -29,18 +29,18 @@ async function switchChannelAction(set: SetStore, channel: Channel): Promise<voi
 
 async function clearHistoryAction(set: SetStore): Promise<void> {
   const riskConfirmed = window.confirm(
-    '高风险操作提醒：将清空当前 Codex 历史索引与会话文件，历史列表将不可恢复显示。\n\n系统会先做本地备份，但不保证所有会话都可直接恢复。\n\n是否继续？'
+    '高风险操作提醒：将清空当前 Codex 历史索引与会话文件，并归档本地状态线程，历史列表将不可恢复显示。\n\n是否继续？'
   );
   if (!riskConfirmed) return;
 
   const finalConfirmed = window.confirm(
-    '最终确认：即将执行历史清理。\n\n将清空 history.jsonl / session_index.jsonl / sessions / archived_sessions。\n\n确认执行吗？'
+    '最终确认：即将执行历史清理。\n\n将清空 history.jsonl / session_index.jsonl / sessions / archived_sessions，并归档 state_5.sqlite 中的可见线程。\n\n确认执行吗？'
   );
   if (!finalConfirmed) return;
 
   set({ actionLocked: true });
   setBusyFlag(set, 'clear', true);
-  setFeedback(set, '正在备份并清理历史...');
+  setFeedback(set, '正在清理历史...');
 
   try {
     const result = await window.codexChannelAPI.clearHistory();
@@ -75,11 +75,11 @@ async function deleteHistoryOneAction(set: SetStore, item: HistoryEntry): Promis
   }
 }
 
-async function openFoxcodeLoginAction(set: SetStore): Promise<void> {
+async function openFoxCodeLoginAction(set: SetStore): Promise<void> {
   setBusyFlag(set, 'login', true);
 
   try {
-    const result = await window.codexChannelAPI.openFoxcodeLogin();
+    const result = await window.codexChannelAPI.openFoxCodeLogin();
     setFeedback(set, result.message, '');
 
     await queryClient.invalidateQueries({ queryKey: codexQueryKeys.loginState });
@@ -93,10 +93,6 @@ async function openFoxcodeLoginAction(set: SetStore): Promise<void> {
 export function createCodexStoreActions(set: SetStore, get: GetStore): CodexStoreActions {
   return {
     isBusy: (key: string): boolean => !!get().busy[key],
-
-    setHistoryExpanded: (expanded: boolean): void => {
-      set({ historyExpanded: expanded });
-    },
 
     setFeedback: (message = '', error = ''): void => {
       setFeedback(set, message, error);
@@ -114,8 +110,8 @@ export function createCodexStoreActions(set: SetStore, get: GetStore): CodexStor
       await deleteHistoryOneAction(set, item);
     },
 
-    openFoxcodeLogin: async (): Promise<void> => {
-      await openFoxcodeLoginAction(set);
+    openFoxCodeLogin: async (): Promise<void> => {
+      await openFoxCodeLoginAction(set);
     }
   };
 }

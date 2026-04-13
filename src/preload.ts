@@ -25,7 +25,7 @@ type HistoryEntry = {
   id: string;
   threadName: string;
   updatedAt: string;
-  storage: 'sessions' | 'archived_sessions' | 'index_only';
+  storage: 'sessions' | 'archived_sessions' | 'index_only' | 'state_sqlite';
 };
 
 type HistoryListResult = {
@@ -38,7 +38,7 @@ type DeleteHistoryOneResult = {
   errors: string[];
 };
 
-type FoxcodeQuotaResult = {
+type FoxCodeQuotaResult = {
   ok: boolean;
   requiresLogin: boolean;
   hasCookie: boolean;
@@ -51,14 +51,34 @@ type FoxcodeQuotaResult = {
   };
 };
 
-type FoxcodeLoginState = {
+type FoxCodeStatusResult = {
+  ok: boolean;
+  message: string;
+  data?: {
+    moduleName: 'FoxCode';
+    submoduleName: 'FoxCodex 状态';
+    groupName: string;
+    monitorName: string;
+    monitorId: number;
+    uptime24h: number | null;
+    latestStatus: 'up' | 'down' | 'unknown';
+    latestCheckedAt: string;
+    heartbeatPoints: Array<{
+      status: 1 | 0 | -1;
+      time: string;
+    }>;
+    heartbeatWindowLabel: string;
+  };
+};
+
+type FoxCodeLoginState = {
   hasCookie: boolean;
   isAuthenticated: boolean;
   cookieCount: number;
   message: string;
 };
 
-type FoxcodeOpenLoginResult = {
+type FoxCodeOpenLoginResult = {
   opened: boolean;
   message: string;
 };
@@ -70,9 +90,10 @@ const api = {
   listHistory: (): Promise<HistoryListResult> => ipcRenderer.invoke('history:list'),
   deleteHistoryOne: (sessionId: string): Promise<DeleteHistoryOneResult> =>
     ipcRenderer.invoke('history:delete-one', sessionId),
-  openFoxcodeLogin: (): Promise<FoxcodeOpenLoginResult> => ipcRenderer.invoke('foxcode:open-login'),
-  getFoxcodeLoginState: (): Promise<FoxcodeLoginState> => ipcRenderer.invoke('foxcode:login-state'),
-  fetchFoxcodeQuota: (): Promise<FoxcodeQuotaResult> => ipcRenderer.invoke('foxcode:fetch-quota')
+  openFoxCodeLogin: (): Promise<FoxCodeOpenLoginResult> => ipcRenderer.invoke('foxcode:open-login'),
+  getFoxCodeLoginState: (): Promise<FoxCodeLoginState> => ipcRenderer.invoke('foxcode:login-state'),
+  fetchFoxCodeQuota: (): Promise<FoxCodeQuotaResult> => ipcRenderer.invoke('foxcode:fetch-quota'),
+  fetchFoxCodeStatus: (): Promise<FoxCodeStatusResult> => ipcRenderer.invoke('foxcode:fetch-status')
 };
 
 contextBridge.exposeInMainWorld('codexChannelAPI', api);

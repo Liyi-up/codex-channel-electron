@@ -14,6 +14,7 @@ export function formatUpdatedAt(value: string): string {
 export function storageText(storage: HistoryEntry['storage']): string {
   if (storage === 'sessions') return '活跃';
   if (storage === 'archived_sessions') return '归档';
+  if (storage === 'state_sqlite') return '本地状态';
   return '仅索引';
 }
 

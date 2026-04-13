@@ -23,7 +23,7 @@ export type HistoryEntry = {
   id: string;
   threadName: string;
   updatedAt: string;
-  storage: 'sessions' | 'archived_sessions' | 'index_only';
+  storage: 'sessions' | 'archived_sessions' | 'index_only' | 'state_sqlite';
 };
 
 export type HistoryListResult = {
@@ -36,7 +36,7 @@ export type DeleteHistoryOneResult = {
   errors: string[];
 };
 
-export type FoxcodeQuotaResult = {
+export type FoxCodeQuotaResult = {
   ok: boolean;
   requiresLogin: boolean;
   hasCookie: boolean;
@@ -49,14 +49,34 @@ export type FoxcodeQuotaResult = {
   };
 };
 
-export type FoxcodeLoginState = {
+export type FoxCodeStatusResult = {
+  ok: boolean;
+  message: string;
+  data?: {
+    moduleName: 'FoxCode';
+    submoduleName: 'FoxCodex 状态';
+    groupName: string;
+    monitorName: string;
+    monitorId: number;
+    uptime24h: number | null;
+    latestStatus: 'up' | 'down' | 'unknown';
+    latestCheckedAt: string;
+    heartbeatPoints: Array<{
+      status: 1 | 0 | -1;
+      time: string;
+    }>;
+    heartbeatWindowLabel: string;
+  };
+};
+
+export type FoxCodeLoginState = {
   hasCookie: boolean;
   isAuthenticated: boolean;
   cookieCount: number;
   message: string;
 };
 
-export type FoxcodeOpenLoginResult = {
+export type FoxCodeOpenLoginResult = {
   opened: boolean;
   message: string;
 };
@@ -65,9 +85,27 @@ export type BusyMap = Record<string, boolean>;
 
 export type QuotaView = {
   total: string;
-  month: string;
   username: string;
   updatedAt: string;
+  meta: string;
+};
+
+export type FoxCodexStatusView = {
+  moduleName: string;
+  submoduleName: string;
+  groupName: string;
+  monitorName: string;
+  uptime24hText: string;
+  latestStatusText: string;
+  latestCheckedAt: string;
+  latestCheckedAgoText: string;
+  heartbeatWindowLabel: string;
+  heartbeatPoints: Array<{
+    tone: 'up' | 'down' | 'unknown';
+    time: string;
+    statusText: string;
+  }>;
+  tone: 'up' | 'down' | 'unknown';
   meta: string;
 };
 
@@ -77,7 +115,8 @@ export type CodexChannelAPI = {
   clearHistory: () => Promise<ClearHistoryResult>;
   listHistory: () => Promise<HistoryListResult>;
   deleteHistoryOne: (sessionId: string) => Promise<DeleteHistoryOneResult>;
-  openFoxcodeLogin: () => Promise<FoxcodeOpenLoginResult>;
-  getFoxcodeLoginState: () => Promise<FoxcodeLoginState>;
-  fetchFoxcodeQuota: () => Promise<FoxcodeQuotaResult>;
+  openFoxCodeLogin: () => Promise<FoxCodeOpenLoginResult>;
+  getFoxCodeLoginState: () => Promise<FoxCodeLoginState>;
+  fetchFoxCodeQuota: () => Promise<FoxCodeQuotaResult>;
+  fetchFoxCodeStatus: () => Promise<FoxCodeStatusResult>;
 };

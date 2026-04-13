@@ -1,6 +1,6 @@
-import type { FoxcodeLoginState, FoxcodeQuotaResult } from '../types';
+import type { FoxCodeLoginState, FoxCodeQuotaResult } from '../types';
 
-export function makeQuotaMeta(result: FoxcodeQuotaResult): string {
+export function makeQuotaMeta(result: FoxCodeQuotaResult): string {
   const meta: string[] = [];
 
   if (result.requiresLogin) meta.push('状态: 需要登录');
@@ -9,7 +9,7 @@ export function makeQuotaMeta(result: FoxcodeQuotaResult): string {
   return meta.join(' | ');
 }
 
-export function buildLoginHint(loginState: FoxcodeLoginState): { envHint: string; showFoxLogin: boolean } {
+export function buildLoginHint(loginState: FoxCodeLoginState): { envHint: string; showFoxLogin: boolean } {
   if (loginState.isAuthenticated) {
     return {
       showFoxLogin: false,

@@ -31,7 +31,7 @@ type HistoryEntry = {
   id: string;
   threadName: string;
   updatedAt: string;
-  storage: 'sessions' | 'archived_sessions' | 'index_only';
+  storage: 'sessions' | 'archived_sessions' | 'index_only' | 'state_sqlite';
 };
 
 type HistoryListResult = {
@@ -44,29 +44,51 @@ type DeleteHistoryOneResult = {
   errors: string[];
 };
 
-type FoxcodeQuotaData = {
+type FoxCodeQuotaData = {
   totalQuota: string;
   monthQuota: string;
   username: string;
 };
 
-type FoxcodeQuotaResult = {
+type FoxCodeQuotaResult = {
   ok: boolean;
   requiresLogin: boolean;
   hasCookie: boolean;
   message: string;
   apiEndpoint?: string;
-  data?: FoxcodeQuotaData;
+  data?: FoxCodeQuotaData;
 };
 
-type FoxcodeLoginState = {
+type FoxCodeStatusData = {
+  moduleName: 'FoxCode';
+  submoduleName: 'FoxCodex 状态';
+  groupName: string;
+  monitorName: string;
+  monitorId: number;
+  uptime24h: number | null;
+  latestStatus: 'up' | 'down' | 'unknown';
+  latestCheckedAt: string;
+  heartbeatPoints: Array<{
+    status: 1 | 0 | -1;
+    time: string;
+  }>;
+  heartbeatWindowLabel: string;
+};
+
+type FoxCodeStatusResult = {
+  ok: boolean;
+  message: string;
+  data?: FoxCodeStatusData;
+};
+
+type FoxCodeLoginState = {
   hasCookie: boolean;
   isAuthenticated: boolean;
   cookieCount: number;
   message: string;
 };
 
-type FoxcodeOpenLoginResult = {
+type FoxCodeOpenLoginResult = {
   opened: boolean;
   message: string;
 };
@@ -89,12 +111,15 @@ const CHANNEL_FILES: Record<Channel, { config: string; auth: string }> = {
 const HISTORY_FILES = [path.join(BASE_DIR, 'history.jsonl'), path.join(BASE_DIR, 'session_index.jsonl')];
 
 const HISTORY_DIRS = [path.join(BASE_DIR, 'sessions'), path.join(BASE_DIR, 'archived_sessions')];
+const STATE_DB_PATH = path.join(BASE_DIR, 'state_5.sqlite');
 
-const APP_WINDOW_TITLE = 'codex channel';
+const APP_WINDOW_TITLE = 'Codex Channel';
 
 const FOXCODE_PARTITION = 'persist:foxcode-auth';
 const FOXCODE_LOGIN_URL = 'https://foxcode.rjj.cc/auth/login';
 const FOXCODE_DASHBOARD_URL = 'https://foxcode.rjj.cc/dashboard';
+const FOXCODE_STATUS_PAGE_API = 'https://status.rjj.cc/api/status-page/foxcode';
+const FOXCODE_STATUS_HEARTBEAT_API = 'https://status.rjj.cc/api/status-page/heartbeat/foxcode';
 
 function readBufferSafe(filePath: string): Buffer | null {
   try {
@@ -282,22 +307,10 @@ function clearHistory(): ClearHistoryResult {
   const actions: string[] = [];
   const errors: string[] = [];
 
-  const backupRoot = path.join(BASE_DIR, '.history-backups');
-  const stamp = new Date()
-    .toISOString()
-    .replace(/[-:TZ.]/g, '')
-    .slice(0, 14);
-  const backupDir = path.join(backupRoot, stamp);
-  ensureDir(backupDir);
-
   for (const filePath of HISTORY_FILES) {
     const fileName = path.basename(filePath);
     try {
-      if (fs.existsSync(filePath)) {
-        fs.copyFileSync(filePath, path.join(backupDir, fileName));
-      } else {
-        ensureDir(path.dirname(filePath));
-      }
+      ensureDir(path.dirname(filePath));
       fs.writeFileSync(filePath, '');
       fs.chmodSync(filePath, 0o600);
       actions.push(`已清空文件: ${fileName}`);
@@ -309,9 +322,6 @@ function clearHistory(): ClearHistoryResult {
   for (const dirPath of HISTORY_DIRS) {
     const dirName = path.basename(dirPath);
     try {
-      if (fs.existsSync(dirPath)) {
-        fs.cpSync(dirPath, path.join(backupDir, dirName), { recursive: true });
-      }
       ensureDir(dirPath);
       clearDirContent(dirPath);
       actions.push(`已清空目录: ${dirName}`);
@@ -320,7 +330,13 @@ function clearHistory(): ClearHistoryResult {
     }
   }
 
-  actions.push(`备份位置: ${backupDir}`);
+  try {
+    const archivedCount = archiveAllSqliteThreads();
+    actions.push(archivedCount > 0 ? `已归档本地状态线程: ${archivedCount} 条` : '本地状态线程无需归档');
+  } catch (err) {
+    errors.push(`处理本地状态线程失败: ${(err as Error).message}`);
+  }
+
   return { actions, errors };
 }
 
@@ -410,6 +426,95 @@ function safeDateValue(isoText: string): number {
   return Number.isNaN(value) ? 0 : value;
 }
 
+function epochToIso(value: unknown): string {
+  const n = toFiniteNumber(value);
+  if (n === null) return '-';
+  const ms = n < 1e12 ? n * 1000 : n;
+  const date = new Date(ms);
+  return Number.isNaN(date.getTime()) ? '-' : date.toISOString();
+}
+
+function sqlQuote(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+function readActiveThreadsFromStateSqlite(limit: number): HistoryEntry[] {
+  if (!fs.existsSync(STATE_DB_PATH)) return [];
+
+  const safeLimit = Math.max(1, Math.min(limit, 2000));
+  const query = [
+    'SELECT id, title, updated_at, archived',
+    'FROM threads',
+    'WHERE archived = 0',
+    'ORDER BY updated_at DESC',
+    `LIMIT ${safeLimit};`
+  ].join(' ');
+
+  const result = runCmd('/usr/bin/sqlite3', ['-json', STATE_DB_PATH, query]);
+  if (result.status !== 0) return [];
+
+  const text = String(result.stdout ?? '').trim();
+  if (!text) return [];
+
+  let rows: unknown;
+  try {
+    rows = JSON.parse(text);
+  } catch {
+    return [];
+  }
+
+  if (!Array.isArray(rows)) return [];
+
+  const items: HistoryEntry[] = [];
+  for (const row of rows) {
+    if (!isRecord(row)) continue;
+    const id = normalizeSessionId(row.id);
+    if (!id) continue;
+
+    const title = typeof row.title === 'string' && row.title.trim() ? row.title.trim() : '(未命名会话)';
+    const updatedAt = epochToIso(row.updated_at);
+    items.push({
+      id,
+      threadName: title,
+      updatedAt,
+      storage: 'state_sqlite'
+    });
+  }
+
+  return items;
+}
+
+function archiveSqliteThread(sessionId: string): number {
+  if (!fs.existsSync(STATE_DB_PATH)) return 0;
+  const safeId = sqlQuote(sessionId);
+  const updateSql = [
+    'UPDATE threads',
+    "SET archived = 1, archived_at = CAST(strftime('%s','now') AS INTEGER)",
+    `WHERE id = ${safeId} AND archived = 0;`
+  ].join(' ');
+  const result = runCmd('/usr/bin/sqlite3', [STATE_DB_PATH, updateSql]);
+  if (result.status !== 0) return 0;
+  const changes = runCmd('/usr/bin/sqlite3', [STATE_DB_PATH, 'SELECT changes();']);
+  if (changes.status !== 0) return 0;
+  const value = Number(String(changes.stdout ?? '').trim());
+  return Number.isFinite(value) ? value : 0;
+}
+
+function archiveAllSqliteThreads(): number {
+  if (!fs.existsSync(STATE_DB_PATH)) return 0;
+  const updateSql = [
+    'UPDATE threads',
+    "SET archived = 1, archived_at = CAST(strftime('%s','now') AS INTEGER)",
+    'WHERE archived = 0;'
+  ].join(' ');
+  const result = runCmd('/usr/bin/sqlite3', [STATE_DB_PATH, updateSql]);
+  if (result.status !== 0) return 0;
+  const changes = runCmd('/usr/bin/sqlite3', [STATE_DB_PATH, 'SELECT changes();']);
+  if (changes.status !== 0) return 0;
+  const value = Number(String(changes.stdout ?? '').trim());
+  return Number.isFinite(value) ? value : 0;
+}
+
 function listHistory(limit = 120): HistoryListResult {
   const indexPath = path.join(BASE_DIR, 'session_index.jsonl');
   const fileMap = new Map<string, { active: boolean; archived: boolean }>();
@@ -430,52 +535,84 @@ function listHistory(limit = 120): HistoryListResult {
     fileMap.set(id, bucket);
   }
 
-  if (!fs.existsSync(indexPath)) {
-    return { items: [], total: 0 };
-  }
+  const allItemsMap = new Map<string, HistoryEntry>();
+  const upsert = (item: HistoryEntry): void => {
+    const existing = allItemsMap.get(item.id);
+    if (!existing) {
+      allItemsMap.set(item.id, item);
+      return;
+    }
 
-  const raw = fs.readFileSync(indexPath, 'utf8');
-  const allItems: HistoryEntry[] = [];
+    const nextDate = safeDateValue(item.updatedAt);
+    const prevDate = safeDateValue(existing.updatedAt);
+    const nextNameBetter = item.threadName && item.threadName !== '(未命名会话)' && existing.threadName === '(未命名会话)';
 
-  for (const line of raw.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-
-    try {
-      const parsed = JSON.parse(trimmed) as unknown;
-      if (!isRecord(parsed)) continue;
-
-      const id = pickSessionIdFromRecord(parsed);
-      if (!id) continue;
-
-      const storageState = fileMap.get(id);
-      let storage: HistoryEntry['storage'] = 'index_only';
-      if (storageState?.active) {
-        storage = 'sessions';
-      } else if (storageState?.archived) {
-        storage = 'archived_sessions';
-      }
-
-      const threadNameRaw = parsed.thread_name ?? parsed.threadName ?? parsed.name;
-      const updatedAtRaw = parsed.updated_at ?? parsed.updatedAt ?? parsed.timestamp ?? parsed.ts;
-      const updatedAt =
-        typeof updatedAtRaw === 'number'
-          ? new Date(updatedAtRaw < 1e12 ? updatedAtRaw * 1000 : updatedAtRaw).toISOString()
-          : typeof updatedAtRaw === 'string'
-            ? updatedAtRaw.trim()
-            : '';
-
-      allItems.push({
-        id,
-        threadName: typeof threadNameRaw === 'string' && threadNameRaw.trim() ? threadNameRaw.trim() : '(未命名会话)',
-        updatedAt: updatedAt || '-',
-        storage
+    if (nextDate > prevDate || nextNameBetter) {
+      allItemsMap.set(item.id, {
+        ...existing,
+        threadName: item.threadName,
+        updatedAt: item.updatedAt,
+        storage: existing.storage === 'state_sqlite' ? item.storage : existing.storage
       });
-    } catch {
-      // 忽略损坏行，避免单行异常阻断整个列表读取
+      return;
+    }
+
+    if (existing.storage === 'index_only' && item.storage !== 'index_only') {
+      allItemsMap.set(item.id, { ...existing, storage: item.storage });
+    }
+  };
+
+  const sqliteItems = readActiveThreadsFromStateSqlite(Math.max(limit * 3, 240)).map((item) => {
+    const storageState = fileMap.get(item.id);
+    if (storageState?.active) return { ...item, storage: 'sessions' as const };
+    if (storageState?.archived) return { ...item, storage: 'archived_sessions' as const };
+    return item;
+  });
+  for (const item of sqliteItems) upsert(item);
+
+  if (fs.existsSync(indexPath)) {
+    const raw = fs.readFileSync(indexPath, 'utf8');
+    for (const line of raw.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      try {
+        const parsed = JSON.parse(trimmed) as unknown;
+        if (!isRecord(parsed)) continue;
+
+        const id = pickSessionIdFromRecord(parsed);
+        if (!id) continue;
+
+        const storageState = fileMap.get(id);
+        let storage: HistoryEntry['storage'] = 'index_only';
+        if (storageState?.active) {
+          storage = 'sessions';
+        } else if (storageState?.archived) {
+          storage = 'archived_sessions';
+        }
+
+        const threadNameRaw = parsed.thread_name ?? parsed.threadName ?? parsed.name;
+        const updatedAtRaw = parsed.updated_at ?? parsed.updatedAt ?? parsed.timestamp ?? parsed.ts;
+        const updatedAt =
+          typeof updatedAtRaw === 'number'
+            ? new Date(updatedAtRaw < 1e12 ? updatedAtRaw * 1000 : updatedAtRaw).toISOString()
+            : typeof updatedAtRaw === 'string'
+              ? updatedAtRaw.trim()
+              : '';
+
+        upsert({
+          id,
+          threadName: typeof threadNameRaw === 'string' && threadNameRaw.trim() ? threadNameRaw.trim() : '(未命名会话)',
+          updatedAt: updatedAt || '-',
+          storage
+        });
+      } catch {
+        // 忽略损坏行，避免单行异常阻断整个列表读取
+      }
     }
   }
 
+  const allItems = Array.from(allItemsMap.values());
   allItems.sort((a, b) => safeDateValue(b.updatedAt) - safeDateValue(a.updatedAt));
   return {
     total: allItems.length,
@@ -547,16 +684,22 @@ function deleteHistoryOne(sessionId: string): DeleteHistoryOneResult {
 
   if (filesToDelete.length === 0) {
     actions.push('未找到对应会话文件');
-    return { actions, errors };
+  } else {
+    for (const filePath of filesToDelete) {
+      try {
+        fs.rmSync(filePath, { force: true });
+        actions.push(`已删除文件: ${path.relative(BASE_DIR, filePath)}`);
+      } catch (err) {
+        errors.push(`删除文件失败(${filePath}): ${(err as Error).message}`);
+      }
+    }
   }
 
-  for (const filePath of filesToDelete) {
-    try {
-      fs.rmSync(filePath, { force: true });
-      actions.push(`已删除文件: ${path.relative(BASE_DIR, filePath)}`);
-    } catch (err) {
-      errors.push(`删除文件失败(${filePath}): ${(err as Error).message}`);
-    }
+  try {
+    const archived = archiveSqliteThread(normalizedId);
+    actions.push(archived > 0 ? '已归档本地状态线程' : '本地状态线程中未找到该会话或已归档');
+  } catch (err) {
+    errors.push(`处理本地状态线程失败: ${(err as Error).message}`);
   }
 
   return { actions, errors };
@@ -638,6 +781,208 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutErr
   return Promise.race([promise, timeoutPromise]);
 }
 
+async function fetchJsonPayload(url: string): Promise<unknown> {
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      accept: 'application/json'
+    },
+    cache: 'no-store'
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  return response.json() as Promise<unknown>;
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+function findFoxCodexMonitor(payload: unknown): { id: number; name: string; groupName: string } | null {
+  if (!isRecord(payload)) return null;
+  const groupList = payload.publicGroupList;
+  if (!Array.isArray(groupList)) return null;
+
+  type MonitorCandidate = {
+    id: number;
+    name: string;
+    groupName: string;
+    groupNameLower: string;
+    monitorNameLower: string;
+  };
+  const candidates: MonitorCandidate[] = [];
+
+  for (const group of groupList) {
+    if (!isRecord(group)) continue;
+    const rawGroupName = typeof group.name === 'string' ? group.name.trim() : '';
+    const groupNameLower = rawGroupName.toLowerCase();
+    const monitorList = group.monitorList;
+    if (!Array.isArray(monitorList)) continue;
+
+    for (const monitor of monitorList) {
+      if (!isRecord(monitor)) continue;
+      const monitorName = typeof monitor.name === 'string' ? monitor.name.trim() : '';
+      if (!monitorName) continue;
+      const monitorNameLower = monitorName.toLowerCase();
+
+      const idNumber = toFiniteNumber(monitor.id);
+      if (idNumber === null) continue;
+
+      const relatedToCodex = groupNameLower.includes('codex') || monitorNameLower.includes('codex');
+      if (!relatedToCodex) continue;
+
+      candidates.push({
+        id: idNumber,
+        name: monitorName,
+        groupName: rawGroupName || 'Codex 分组',
+        groupNameLower,
+        monitorNameLower
+      });
+    }
+  }
+
+  if (candidates.length === 0) return null;
+
+  const preferred =
+    candidates.find((item) => item.groupNameLower === 'codex 分组' && item.monitorNameLower === 'codex 官方线路') ??
+    candidates.find((item) => item.groupNameLower === 'codex 分组' && item.monitorNameLower.includes('codex')) ??
+    candidates.find((item) => item.groupNameLower.includes('codex') && item.monitorNameLower.includes('codex')) ??
+    candidates[0];
+
+  return preferred ?? null;
+}
+
+function parseFoxCodexHeartbeat(
+  payload: unknown,
+  monitorId: number
+): Pick<FoxCodeStatusData, 'uptime24h' | 'latestStatus' | 'latestCheckedAt' | 'heartbeatPoints' | 'heartbeatWindowLabel'> {
+  let uptime24h: number | null = null;
+  let latestStatus: FoxCodeStatusData['latestStatus'] = 'unknown';
+  let latestCheckedAt = '-';
+  let heartbeatPoints: FoxCodeStatusData['heartbeatPoints'] = [];
+  let heartbeatWindowLabel = '-';
+
+  if (!isRecord(payload)) {
+    return { uptime24h, latestStatus, latestCheckedAt, heartbeatPoints, heartbeatWindowLabel };
+  }
+
+  const uptimeListRaw = payload.uptimeList;
+  if (isRecord(uptimeListRaw)) {
+    const uptimeKey = `${monitorId}_24`;
+    const uptimeValue = toFiniteNumber(uptimeListRaw[uptimeKey]);
+    if (uptimeValue !== null) {
+      uptime24h = Math.max(0, Math.min(1, uptimeValue));
+    }
+  }
+
+  const heartbeatListRaw = payload.heartbeatList;
+  if (!isRecord(heartbeatListRaw)) {
+    return { uptime24h, latestStatus, latestCheckedAt, heartbeatPoints, heartbeatWindowLabel };
+  }
+
+  const heartbeatRows = heartbeatListRaw[String(monitorId)];
+  if (!Array.isArray(heartbeatRows)) {
+    return { uptime24h, latestStatus, latestCheckedAt, heartbeatPoints, heartbeatWindowLabel };
+  }
+
+  const normalizedRows = heartbeatRows.filter((row): row is Record<string, unknown> => isRecord(row));
+  if (normalizedRows.length === 0) {
+    return { uptime24h, latestStatus, latestCheckedAt, heartbeatPoints, heartbeatWindowLabel };
+  }
+
+  const heartbeatRowsToShow = normalizedRows;
+  heartbeatPoints = heartbeatRowsToShow.map((row) => {
+    const statusValue = toFiniteNumber(row.status);
+    const timeValue = typeof row.time === 'string' && row.time.trim() ? row.time.trim() : '-';
+    if (statusValue === 1) return { status: 1, time: timeValue };
+    if (statusValue === 0) return { status: 0, time: timeValue };
+    return { status: -1, time: timeValue };
+  });
+
+  const latestRow = normalizedRows[normalizedRows.length - 1];
+  const latestCheckedAtRaw = typeof latestRow?.time === 'string' ? latestRow.time.trim() : '';
+  latestCheckedAt = latestCheckedAtRaw || '-';
+
+  const latestStatusValue = toFiniteNumber(latestRow?.status);
+  if (latestStatusValue === 1) latestStatus = 'up';
+  else if (latestStatusValue === 0) latestStatus = 'down';
+
+  const firstTimestamp = Date.parse(String(normalizedRows[0]?.time ?? ''));
+  const lastTimestamp = Date.parse(String(normalizedRows[normalizedRows.length - 1]?.time ?? ''));
+
+  let windowMinutes = 0;
+  if (!Number.isNaN(firstTimestamp) && !Number.isNaN(lastTimestamp) && lastTimestamp >= firstTimestamp) {
+    windowMinutes = Math.max(1, Math.round((lastTimestamp - firstTimestamp) / 60000));
+  } else if (normalizedRows.length >= 2) {
+    const prevTimestamp = Date.parse(String(normalizedRows[normalizedRows.length - 2]?.time ?? ''));
+    if (!Number.isNaN(lastTimestamp) && !Number.isNaN(prevTimestamp)) {
+      const intervalMinutes = Math.max(1, Math.round(Math.abs(lastTimestamp - prevTimestamp) / 60000));
+      windowMinutes = intervalMinutes * heartbeatPoints.length;
+    }
+  }
+
+  if (windowMinutes === 0) {
+    windowMinutes = heartbeatPoints.length * 5;
+  }
+
+  if (windowMinutes >= 60) {
+    const hours = windowMinutes / 60;
+    heartbeatWindowLabel = Number.isInteger(hours) ? `${hours}h` : `${hours.toFixed(1)}h`;
+  } else {
+    heartbeatWindowLabel = `${windowMinutes}m`;
+  }
+
+  return { uptime24h, latestStatus, latestCheckedAt, heartbeatPoints, heartbeatWindowLabel };
+}
+
+async function fetchFoxCodeStatus(): Promise<FoxCodeStatusResult> {
+  try {
+    const [statusPagePayload, heartbeatPayload] = await Promise.all([
+      withTimeout(fetchJsonPayload(FOXCODE_STATUS_PAGE_API), 8000, 'FoxCode 状态页请求超时'),
+      withTimeout(fetchJsonPayload(FOXCODE_STATUS_HEARTBEAT_API), 8000, 'FoxCode 心跳数据请求超时')
+    ]);
+
+    const monitor = findFoxCodexMonitor(statusPagePayload);
+    if (!monitor) {
+      return {
+        ok: false,
+        message: '未在 FoxCode 状态页中找到 Codex 分组监控。'
+      };
+    }
+
+    const heartbeat = parseFoxCodexHeartbeat(heartbeatPayload, monitor.id);
+    return {
+      ok: true,
+      message: 'FoxCodex 状态已更新。',
+      data: {
+        moduleName: 'FoxCode',
+        submoduleName: 'FoxCodex 状态',
+        groupName: monitor.groupName,
+        monitorName: monitor.name,
+        monitorId: monitor.id,
+        uptime24h: heartbeat.uptime24h,
+        latestStatus: heartbeat.latestStatus,
+        latestCheckedAt: heartbeat.latestCheckedAt,
+        heartbeatPoints: heartbeat.heartbeatPoints,
+        heartbeatWindowLabel: heartbeat.heartbeatWindowLabel
+      }
+    };
+  } catch {
+    return {
+      ok: false,
+      message: '获取 FoxCodex 状态失败，请稍后重试。'
+    };
+  }
+}
+
 async function waitForDashboardQuota(win: BrowserWindow, waitMs = 5000, intervalMs = 500): Promise<PageSnapshot> {
   let elapsed = 0;
   let latest = await readDashboardSnapshot(win);
@@ -671,19 +1016,19 @@ async function loadUrlWithTimeout(
   return Promise.race([loadPromise, timeoutPromise]);
 }
 
-function getFoxcodeSession() {
+function getFoxCodeSession() {
   return session.fromPartition(FOXCODE_PARTITION);
 }
 
-function hasFoxcodeAuthCookie(cookies: Electron.Cookie[]): boolean {
+function hasFoxCodeAuthCookie(cookies: Electron.Cookie[]): boolean {
   const names = new Set(cookies.map((cookie) => cookie.name.toLowerCase()));
   return names.has('__cookie_session__') || names.has('auth_user');
 }
 
-async function readFoxcodeLoginState(): Promise<FoxcodeLoginState> {
-  const cookies = await getFoxcodeSession().cookies.get({ url: FOXCODE_DASHBOARD_URL });
+async function readFoxCodeLoginState(): Promise<FoxCodeLoginState> {
+  const cookies = await getFoxCodeSession().cookies.get({ url: FOXCODE_DASHBOARD_URL });
   const hasCookie = cookies.length > 0;
-  const isAuthenticated = hasFoxcodeAuthCookie(cookies);
+  const isAuthenticated = hasFoxCodeAuthCookie(cookies);
   return {
     hasCookie,
     isAuthenticated,
@@ -698,7 +1043,7 @@ async function readFoxcodeLoginState(): Promise<FoxcodeLoginState> {
 
 let foxcodeLoginWindow: BrowserWindow | null = null;
 
-async function openFoxcodeLoginWindow(): Promise<FoxcodeOpenLoginResult> {
+async function openFoxCodeLoginWindow(): Promise<FoxCodeOpenLoginResult> {
   if (foxcodeLoginWindow && !foxcodeLoginWindow.isDestroyed()) {
     foxcodeLoginWindow.focus();
     return {
@@ -742,7 +1087,7 @@ async function openFoxcodeLoginWindow(): Promise<FoxcodeOpenLoginResult> {
 
   return {
     opened: true,
-    message: '已打开登录页，请完成登录后回到 codex channel 点击“获取额度”。'
+    message: '已打开登录页，请完成登录后回到 Codex Channel 点击“获取额度”。'
   };
 }
 
@@ -805,7 +1150,7 @@ function pickBestQuotaCandidate(
   return current;
 }
 
-function findQuotaFromJson(payload: unknown): FoxcodeQuotaData | null {
+function findQuotaFromJson(payload: unknown): FoxCodeQuotaData | null {
   const queue: unknown[] = [payload];
   const userKey = /(user(name)?|nick(name)?|account|email|name)/i;
   const monthKey = /(month|monthly|month[_-]?quota|card|package|plan|月卡|月度|月额度)/i;
@@ -869,7 +1214,7 @@ function parseQuotaNumber(text: string): number {
   return Number.isFinite(value) ? value : 0;
 }
 
-function scoreQuotaResponse(url: string, data: FoxcodeQuotaData): number {
+function scoreQuotaResponse(url: string, data: FoxCodeQuotaData): number {
   let score = 0;
   if (/(quota|balance|credit|billing|account|dashboard)/i.test(url)) score += 20;
   if (/(remaining|available|left)/i.test(url)) score += 40;
@@ -886,8 +1231,8 @@ function scoreQuotaResponse(url: string, data: FoxcodeQuotaData): number {
 
 function parseQuotaFromApiResponses(
   responses: CapturedApiResponse[]
-): { data: FoxcodeQuotaData; apiEndpoint: string } | null {
-  let best: { data: FoxcodeQuotaData; apiEndpoint: string; score: number } | null = null;
+): { data: FoxCodeQuotaData; apiEndpoint: string } | null {
+  let best: { data: FoxCodeQuotaData; apiEndpoint: string; score: number } | null = null;
 
   for (const response of responses) {
     if (response.status < 200 || response.status >= 400) continue;
@@ -992,8 +1337,8 @@ async function captureApiResponses(win: BrowserWindow): Promise<CapturedApiRespo
   return responses;
 }
 
-async function fetchFoxcodeQuota(): Promise<FoxcodeQuotaResult> {
-  const loginState = await readFoxcodeLoginState();
+async function fetchFoxCodeQuota(): Promise<FoxCodeQuotaResult> {
+  const loginState = await readFoxCodeLoginState();
   if (!loginState.isAuthenticated) {
     return {
       ok: false,
@@ -1136,11 +1481,13 @@ ipcMain.handle('history:delete-one', async (_event, sessionId: string): Promise<
   return deleteHistoryOne(sessionId);
 });
 
-ipcMain.handle('foxcode:open-login', async (): Promise<FoxcodeOpenLoginResult> => openFoxcodeLoginWindow());
+ipcMain.handle('foxcode:open-login', async (): Promise<FoxCodeOpenLoginResult> => openFoxCodeLoginWindow());
 
-ipcMain.handle('foxcode:login-state', async (): Promise<FoxcodeLoginState> => readFoxcodeLoginState());
+ipcMain.handle('foxcode:login-state', async (): Promise<FoxCodeLoginState> => readFoxCodeLoginState());
 
-ipcMain.handle('foxcode:fetch-quota', async (): Promise<FoxcodeQuotaResult> => fetchFoxcodeQuota());
+ipcMain.handle('foxcode:fetch-quota', async (): Promise<FoxCodeQuotaResult> => fetchFoxCodeQuota());
+
+ipcMain.handle('foxcode:fetch-status', async (): Promise<FoxCodeStatusResult> => fetchFoxCodeStatus());
 
 app.whenReady().then(() => {
   void createWindow();

@@ -1,186 +1,50 @@
-# codex channel
+# Codex Channel
 
-Electron 桌面工具（Electron + React + Vite + React Query + Zustand + Tailwind CSS + shadcn/ui + Lucide），提供以下能力：
+> 面向 macOS 的 Electron 桌面工具：切换 Codex 通道、管理本地历史、查看 FoxCode 额度与 FoxCodex 状态。
 
-- 一键切换 Codex 通道（`fox` / `default`）
-- 切换后尝试刷新 Codex 运行态（CLI / App）
-- 一键清理 Codex 历史对话（先备份再清空）
-- 从 `https://foxcode.rjj.cc/dashboard` 读取并展示额度（按量额度 / 月卡额度）
-- 深色 / 浅色主题切换
-- 日志空状态插画展示（按主题自动切换深浅插画）
+## 目录
+- [核心特性](#核心特性)
+- [快速开始](#快速开始)
+- [安装与运行](#安装与运行)
+- [使用示例](#使用示例)
+- [架构概览](#架构概览)
+- [常用命令](#常用命令)
+- [注意事项](#注意事项)
+- [贡献指南](#贡献指南)
+- [许可证](#许可证)
 
-## 用户安装与启动
+## 核心特性
+- 一键切换 Codex 通道（`fox` / `default`），并尝试刷新 Codex CLI 与 `Codex.app` 运行态。
+- 历史会话管理：刷新列表、单条删除、全量清理。
+- 历史数据双来源读取：`session_index.jsonl` + `state_5.sqlite`。
+- FoxCode 面板：展示按量额度、月卡额度、账号与更新时间。
+- FoxCodex 状态面板：展示 24h 可用率、心跳点序列、最近检测时间与相对时间。
+- 深色/浅色主题切换。
 
-支持两种方式：
+## 快速开始
 
-- 源码运行（开发调试）
-- 打包成平台应用（安装包/可执行目录）
-
-### 1) 环境要求
-
-- macOS（项目内含 `osascript`、`open -a Codex` 等 macOS 命令）
-- Node.js 20+（Vite 8 需要）
+### 前置要求
+- macOS（项目运行链路依赖 `osascript`、`open -a`、`pkill` 等 macOS 行为）。
+- Node.js 20+
 - npm
+- 本机可用 `sqlite3`（用于读取和归档 `~/.codex/state_5.sqlite`）。
 
-### 2) 准备 Codex 配置文件
+### 准备 Codex 配置模板
+应用依赖 `~/.codex` 下的配置模板，至少需要以下文件：
 
-应用依赖 `~/.codex` 目录中的配置文件。请确保以下文件存在：
+- 当前生效文件（切换时会被覆盖）
+  - `~/.codex/config.toml`
+  - `~/.codex/auth.json`
+- 通道模板文件（必须成对）
+  - `~/.codex/config-default.toml` + `~/.codex/auth-default.json`
+  - `~/.codex/config-fox.toml` + `~/.codex/auth-fox.json`
 
-1. 当前生效文件（会被本应用切换覆盖）：
-   - `~/.codex/config.toml`
-   - `~/.codex/auth.json`
-
-2. 通道模板文件（命名规则必须成对）：
-   - `~/.codex/config-<channel>.toml`
-   - `~/.codex/auth-<channel>.json`
-
-其中 `<channel>` 必须一致，表示同一个通道名。
-
-例如：
-
-- `config-default.toml` + `auth-default.json`
-- `config-fox.toml` + `auth-fox.json`
-
-应用切换通道时，会把对应通道模板复制到 `config.toml` 和 `auth.json`。
-
-### 3) 安装依赖
+## 安装与运行
 
 ```bash
 npm install
-```
-
-### 4) 启动应用
-
-```bash
-npm start
-```
-
-`npm start` 会先执行构建，再启动 Electron 桌面应用。
-
-## 从 Clone 到平台 App（打包）
-
-### 1) 克隆仓库
-
-```bash
-git clone <你的仓库地址>
-cd codex-channel-electron
-```
-
-### 2) 安装依赖
-
-```bash
-npm install
-```
-
-### 3) 先确保运行配置已准备（必需）
-
-请先按上方“准备 Codex 配置文件”章节放置 `~/.codex` 下的配置模板。
-
-### 4) 生成当前平台的应用产物
-
-```bash
-# 生成当前平台的解包目录（用于快速验证）
-npm run pack
-
-# macOS 产物（dmg + zip）
-npm run dist:mac
-
-# Windows 产物（nsis + zip）
-npm run dist:win
-
-# Linux 产物（AppImage + tar.gz）
-npm run dist:linux
-```
-
-### 5) 查看产物目录
-
-所有打包输出都在：
-
-```bash
-release/
-```
-
-### 6) 一键替换桌面应用（仅 macOS）
-
-如果你日常是在桌面上的 `codex channel.app` 里验证改动，可以直接运行：
-
-```bash
-# 打包并替换 ~/Desktop/codex channel.app
-npm run deploy:desktop
-
-# 打包、替换并自动启动桌面应用
-npm run deploy:desktop:open
-
-# 自定义桌面应用名称
-npm run deploy:desktop -- --name "My Codex"
-
-# 自定义名称并自动启动
-npm run deploy:desktop:open -- --name "My Codex"
-
-# 先打包再替换（避免重复打包流程）
-npm run build:deploy:desktop
-
-# 先打包、替换并自动启动
-npm run build:deploy:desktop:open
-```
-
-这个命令会自动完成：
-
-- 构建并生成 macOS 解包应用
-- 尝试退出当前正在运行的默认应用或同名桌面应用
-- 用新产物覆盖桌面上的目标 `.app`
-- 可选重新启动桌面应用
-
-说明：
-
-- `codex channel` 只是默认的桌面应用名称，不是强制值。
-- `--name` 只影响桌面上部署出来的 `.app` 名称，不会修改项目默认的 `productName`。
-
-## 使用说明
-
-1. 在“通道控制”里通过下拉框（`default` / `fox`）切换通道。
-2. 切换后应用会尝试刷新 Codex 运行态（CLI/App）。
-3. 在“历史会话”标题右侧可执行：清空历史 / 刷新历史 / 展开收起。
-4. 清空历史会触发二次确认弹窗（风险提示 + 最终确认）。
-5. 如需查看 FoxCode 额度，先登录再点击“获取额度”。
-
-## 注意事项
-
-- 切换通道会直接覆盖 `~/.codex/config.toml` 与 `~/.codex/auth.json`。
-- 清理历史会清空（通过“历史会话”标题右侧删除图标触发）：
-  - `~/.codex/history.jsonl`
-  - `~/.codex/session_index.jsonl`
-  - `~/.codex/sessions/`
-  - `~/.codex/archived_sessions/`
-- 清理前会自动备份到：`~/.codex/.history-backups/<时间戳>/`。
-- 本工具当前固定支持 `default` 与 `fox` 两个通道模板命名。
-- 若缺少上述必要文件，切换时会报错“缺少必要文件”。
-- 仅当本机存在 `/Applications/Codex.app` 时，才会尝试自动重启 Codex App。
-- 跨平台打包建议在对应平台本机执行（例如 mac 产物在 macOS 上打包）。
-
-## FoxCode 额度说明
-
-- 启动时会自动检测 FoxCode 登录 Cookie。
-- 如果存在有效 Cookie，会自动加载额度。
-- 如果无有效 Cookie，会询问是否立即打开登录页；拒绝则跳过。
-- 登录成功后可手动点“获取额度”，或等待自动检测触发刷新。
-
-## 开发
-
-```bash
 npm run dev
 ```
-
-`npm run dev` 会并行启动：
-
-- `tsc --watch`（主进程与 preload）
-- `vite`（渲染层开发服务器）
-- `electron + nodemon`（自动连接 Vite；`main/preload` 变更后自动重启）
-
-热更新行为说明：
-
-- 修改 `src/renderer/**`：Vite HMR（热模块替换）即时生效，无需重启窗口。
-- 修改 `src/main.ts` / `src/preload.ts`：`tsc` 产物更新后，`nodemon` 自动重启 Electron 进程。
 
 如需生产构建后启动：
 
@@ -188,13 +52,96 @@ npm run dev
 npm start
 ```
 
-## 目录
+## 使用示例
 
-- `src/main.ts`：Electron 主进程
-- `src/preload.ts`：安全桥接 API
-- `src/renderer/main.tsx`：React 渲染入口
-- `src/renderer/App.tsx`：页面骨架编排
-- `src/renderer/query/`：基于 React Query 的异步请求管理
-- `src/renderer/store/useCodexStore.ts`：基于 Zustand 的 UI 状态与动作
-- `src/renderer/components/`：渲染层组件
-- `vite.config.ts`：Vite 构建配置
+### 1. 切换通道
+1. 在左侧「通道控制」选择 `fox` 或 `default`。
+2. 点击「切换到目标通道」。
+3. 等待状态提示完成。
+
+### 2. 清理历史会话
+1. 在「历史会话」区域点击清理按钮。
+2. 完成两次确认。
+3. 系统会清空历史索引与会话目录，并将 `state_5.sqlite` 中可见线程标记为归档。
+
+### 3. 查看额度与状态
+1. 首次使用若未登录 FoxCode，点击登录按钮完成认证。
+2. 点击额度刷新按钮获取最新额度。
+3. 在状态区查看心跳点，悬停可查看单点状态与时间。
+
+## 架构概览
+
+- `src/main.ts`：主进程，负责文件系统、进程控制、FoxCode/状态接口抓取、历史与 sqlite 处理、IPC。
+- `src/preload.ts`：桥接层，向渲染进程暴露安全 API。
+- `src/renderer/App.tsx`：页面编排、查询状态聚合与反馈控制。
+- `src/renderer/components/ChannelPanel.tsx`：通道切换与历史会话 UI。
+- `src/renderer/components/QuotaPanel.tsx`：FoxCode 额度 + FoxCodex 状态 UI。
+- `src/renderer/query/codexQueries.ts`：React Query 查询定义（含轮询与重连策略）。
+- `scripts/deploy-desktop-app.sh`：桌面应用替换脚本（macOS）。
+
+## 常用命令
+
+### 开发
+```bash
+npm run dev
+npm run lint
+npm run format:check
+```
+
+### 构建与打包
+```bash
+npm run build
+npm run pack
+npm run dist:mac
+npm run dist:win
+npm run dist:linux
+```
+
+### 桌面部署（macOS）
+```bash
+npm run deploy:desktop
+npm run deploy:desktop:open
+npm run deploy:desktop -- --name "My Codex"
+npm run build:deploy:desktop
+npm run build:deploy:desktop:open
+```
+
+### 提交后自动桌面替换（可选）
+```bash
+npm run hooks:install
+```
+
+启用后，每次执行 `git commit` 都会自动触发 `npm run build:deploy:desktop`。
+
+如果某次提交想临时跳过自动替换：
+
+```bash
+SKIP_AUTO_DESKTOP_DEPLOY=1 git commit -m "your message"
+```
+
+## 注意事项
+- 通道切换会覆盖 `~/.codex/config.toml` 与 `~/.codex/auth.json`。
+- 历史全量清理会清空：
+  - `~/.codex/history.jsonl`
+  - `~/.codex/session_index.jsonl`
+  - `~/.codex/sessions/`
+  - `~/.codex/archived_sessions/`
+- 历史清理和单条删除会同步归档 `~/.codex/state_5.sqlite` 的 `threads` 记录。
+- 本工具当前只内置 `default` 与 `fox` 两个通道模板。
+- `/Applications/Codex.app` 不存在时，不会执行 App 重启链路。
+- Windows/Linux 当前主要提供打包能力，不代表运行链路已完整适配。
+
+## 贡献指南
+- 提交前至少执行：
+  - `npm run lint`
+  - `npm run build`
+- 如需提交后自动打包并替换桌面 app，执行一次 `npm run hooks:install`。
+- 涉及 UI 调整时，补充手动验证：
+  - 通道切换
+  - 历史刷新/删除
+  - 额度刷新
+  - 状态刷新与心跳 hover
+- 需要 AI 协作约束时，请同时查看仓库根目录 `AGENTS.md`。
+
+## 许可证
+当前仓库在 `package.json` 中标记为 `private: true`，未声明开源许可证。
