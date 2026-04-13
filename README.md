@@ -98,6 +98,36 @@ npm run dist:linux
 release/
 ```
 
+### 6) 一键替换桌面应用（仅 macOS）
+
+如果你日常是在桌面上的 `codex channel.app` 里验证改动，可以直接运行：
+
+```bash
+# 打包并替换 ~/Desktop/codex channel.app
+npm run deploy:desktop
+
+# 打包、替换并自动启动桌面应用
+npm run deploy:desktop:open
+
+# 自定义桌面应用名称
+npm run deploy:desktop -- --name "My Codex"
+
+# 自定义名称并自动启动
+npm run deploy:desktop:open -- --name "My Codex"
+```
+
+这个命令会自动完成：
+
+- 构建并生成 macOS 解包应用
+- 尝试退出当前正在运行的默认应用或同名桌面应用
+- 用新产物覆盖桌面上的目标 `.app`
+- 可选重新启动桌面应用
+
+说明：
+
+- `codex channel` 只是默认的桌面应用名称，不是强制值。
+- `--name` 只影响桌面上部署出来的 `.app` 名称，不会修改项目默认的 `productName`。
+
 ## 使用说明
 
 1. 启动后点击通道按钮（`default` 或 `fox`）进行切换。

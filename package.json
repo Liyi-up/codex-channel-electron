@@ -16,6 +16,8 @@
     "dev": "npm run clean && concurrently -k -n MAIN,RENDERER,ELECTRON -c yellow,cyan,green \"npm:dev:main\" \"npm:dev:renderer\" \"npm:dev:electron\"",
     "start": "npm run build && electron .",
     "pack": "npm run build && electron-builder --dir",
+    "deploy:desktop": "bash ./scripts/deploy-desktop-app.sh",
+    "deploy:desktop:open": "bash ./scripts/deploy-desktop-app.sh --open",
     "dist:mac": "npm run build && electron-builder --mac",
     "dist:win": "npm run build && electron-builder --win",
     "dist:linux": "npm run build && electron-builder --linux",
@@ -28,6 +30,7 @@
     "appId": "com.codex.channel.electron",
     "productName": "codex channel",
     "asar": true,
+    "icon": "build-assets/codex.icns",
     "directories": {
       "output": "release"
     },
@@ -37,6 +40,7 @@
     ],
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "mac": {
+      "icon": "build-assets/codex.icns",
       "target": [
         "dmg",
         "zip"
