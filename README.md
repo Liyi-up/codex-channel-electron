@@ -17,7 +17,7 @@
 - 一键切换 Codex 通道（`fox` / `default`），并尝试刷新 Codex CLI 与 `Codex.app` 运行态。
 - 历史会话管理：刷新列表、单条删除、全量清理。
 - 历史数据双来源读取：`session_index.jsonl` + `state_5.sqlite`。
-- FoxCode 面板：展示按量额度、月卡额度、账号与更新时间。
+- FoxCode 面板：展示按量额度、账号信息状态与更新时间。
 - FoxCodex 状态面板：展示 24h 可用率、心跳点序列、最近检测时间与相对时间。
 - 深色/浅色主题切换。
 
@@ -26,7 +26,7 @@
 ### 前置要求
 - macOS（项目运行链路依赖 `osascript`、`open -a`、`pkill` 等 macOS 行为）。
 - Node.js 20+
-- npm
+- pnpm
 - 本机可用 `sqlite3`（用于读取和归档 `~/.codex/state_5.sqlite`）。
 
 ### 准备 Codex 配置模板
@@ -42,14 +42,14 @@
 ## 安装与运行
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
 如需生产构建后启动：
 
 ```bash
-npm start
+pnpm start
 ```
 
 ## 使用示例
@@ -83,35 +83,35 @@ npm start
 
 ### 开发
 ```bash
-npm run dev
-npm run lint
-npm run format:check
+pnpm run dev
+pnpm run lint
+pnpm run format:check
 ```
 
 ### 构建与打包
 ```bash
-npm run build
-npm run pack
-npm run dist:mac
-npm run dist:win
-npm run dist:linux
+pnpm run build
+pnpm run pack
+pnpm run dist:mac
+pnpm run dist:win
+pnpm run dist:linux
 ```
 
 ### 桌面部署（macOS）
 ```bash
-npm run deploy:desktop
-npm run deploy:desktop:open
-npm run deploy:desktop -- --name "My Codex"
-npm run build:deploy:desktop
-npm run build:deploy:desktop:open
+pnpm run deploy:desktop
+pnpm run deploy:desktop:open
+pnpm run deploy:desktop -- --name "My Codex"
+pnpm run build:deploy:desktop
+pnpm run build:deploy:desktop:open
 ```
 
 ### 提交后自动桌面替换（可选）
 ```bash
-npm run hooks:install
+pnpm run hooks:install
 ```
 
-启用后，每次执行 `git commit` 都会自动触发 `npm run build:deploy:desktop`。
+启用后，每次执行 `git commit` 都会自动触发 `pnpm run build:deploy:desktop`。
 
 如果某次提交想临时跳过自动替换：
 
@@ -133,9 +133,9 @@ SKIP_AUTO_DESKTOP_DEPLOY=1 git commit -m "your message"
 
 ## 贡献指南
 - 提交前至少执行：
-  - `npm run lint`
-  - `npm run build`
-- 如需提交后自动打包并替换桌面 app，执行一次 `npm run hooks:install`。
+  - `pnpm run lint`
+  - `pnpm run build`
+- 如需提交后自动打包并替换桌面 app，执行一次 `pnpm run hooks:install`。
 - 涉及 UI 调整时，补充手动验证：
   - 通道切换
   - 历史刷新/删除

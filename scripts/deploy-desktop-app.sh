@@ -44,7 +44,7 @@ DESKTOP_APP_PATH="$HOME/Desktop/$DESKTOP_APP_NAME"
 
 if [[ "$SHOULD_PACK" == "true" ]]; then
   echo "Building app package..."
-  npm --prefix "$ROOT_DIR" run pack
+  pnpm --dir "$ROOT_DIR" run pack
 else
   echo "Skip pack, using existing build output..."
 fi

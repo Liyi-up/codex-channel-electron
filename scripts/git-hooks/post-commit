@@ -17,13 +17,13 @@ if [[ -z "$ROOT_DIR" ]]; then
   exit 0
 fi
 
-if ! command -v npm >/dev/null 2>&1; then
-  echo "[auto-deploy] 未找到 npm，跳过自动桌面部署。" >&2
+if ! command -v pnpm >/dev/null 2>&1; then
+  echo "[auto-deploy] 未找到 pnpm，跳过自动桌面部署。" >&2
   exit 0
 fi
 
 echo "[auto-deploy] 检测到 commit，开始打包并替换桌面应用..."
-if npm --prefix "$ROOT_DIR" run build:deploy:desktop; then
+if pnpm --dir "$ROOT_DIR" run build:deploy:desktop; then
   echo "[auto-deploy] 桌面应用替换完成。"
 else
   echo "[auto-deploy] 自动桌面部署失败（commit 已完成，不受影响）。" >&2

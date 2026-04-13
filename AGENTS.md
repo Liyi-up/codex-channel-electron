@@ -41,14 +41,14 @@
 
 ## 4. Common Commands
 
-- `npm run dev` — 本地开发（main/renderer/electron 联动）。
-- `npm run lint` — ESLint 检查。
-- `npm run build` — 全量构建（提交前最低门槛）。
-- `npm run pack` — 生成解包应用目录。
-- `npm run deploy:desktop` — macOS 桌面应用替换。
-- `npm run hooks:install` — 启用仓库级 Git hooks（post-commit 自动桌面替换）。
+- `pnpm run dev` — 本地开发（main/renderer/electron 联动）。
+- `pnpm run lint` — ESLint 检查。
+- `pnpm run build` — 全量构建（提交前最低门槛）。
+- `pnpm run pack` — 生成解包应用目录。
+- `pnpm run deploy:desktop` — macOS 桌面应用替换。
+- `pnpm run hooks:install` — 启用仓库级 Git hooks（post-commit 自动桌面替换）。
 
-> 仓库当前未提供自动化测试脚本（无 `npm run test`）。涉及行为变更时必须补充手动回归说明。
+> 仓库当前未提供自动化测试脚本（无 `pnpm run test`）。涉及行为变更时必须补充手动回归说明。
 
 ## 5. Architecture Decisions
 
@@ -75,8 +75,8 @@
 
 - MUST 最小改动，禁止无关重构。
 - MUST 保持主进程与渲染层边界清晰。
-- MUST 在 UI 或交互改动后执行 `npm run build`。
-- SHOULD 在逻辑改动后执行 `npm run lint`。
+- MUST 在 UI 或交互改动后执行 `pnpm run build`。
+- SHOULD 在逻辑改动后执行 `pnpm run lint`。
 - MUST 在涉及下列文件时先说明影响面再改：
   - `~/.codex/config.toml` / `~/.codex/auth.json`
   - `~/.codex/history.jsonl` / `session_index.jsonl`
