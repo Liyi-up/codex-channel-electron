@@ -110,7 +110,6 @@
 
   .history-content-inner {
     min-height: 0;
-    overflow: hidden;
   }
 
   .history-content.is-open {

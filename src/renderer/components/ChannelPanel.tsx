@@ -43,7 +43,7 @@ function ChannelPanel(props: ChannelPanelProps) {
   const hasAnyLog = hasMessage || hasError;
 
   return (
-    <aside className="panel rounded-2xl border border-border/80 p-4 flex min-h-0 flex-col">
+    <aside className="panel panel-scroll rounded-2xl border border-border/80 p-4 flex min-h-0 flex-col">
       <h2 className="text-base font-semibold">通道控制</h2>
       <p className="mt-1 text-xs text-textSub">切换后会尝试刷新 Codex CLI / App 运行态。</p>
 
@@ -100,7 +100,7 @@ function ChannelPanel(props: ChannelPanelProps) {
         </p>
       </section>
 
-      <section className="history-wrap mt-4 rounded-xl border border-border/80 bg-black/20 p-3 flex min-h-0 flex-1 flex-col">
+      <section className="history-wrap mt-4 rounded-xl border border-border/80 bg-black/20 p-3 flex shrink-0 flex-col">
         <button type="button" className="history-summary" aria-expanded={historyExpanded} onClick={onToggleHistory}>
           <span className="text-xs font-semibold tracking-wide text-textMain">历史会话</span>
           <span className="history-summary-icon" aria-hidden="true">
@@ -147,7 +147,7 @@ function ChannelPanel(props: ChannelPanelProps) {
         </div>
       </section>
 
-      <section className="mt-3 grid min-h-[180px] gap-2">
+      <section className="mt-3 grid min-h-[180px] flex-1 gap-2">
         <p className="text-[11px] text-textSub">运行日志</p>
         <div className="log-box min-h-[150px]">
           {hasMessage ? <p className="whitespace-pre-wrap text-emerald-300">{message}</p> : null}
