@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MoonStar, SunMedium } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import ChannelPanel from './components/ChannelPanel';
 import QuotaPanel from './components/QuotaPanel';
+import { Button } from './components/ui/button';
 import {
   useChannelStateQuery,
   useFoxcodeLoginStateQuery,
@@ -10,7 +12,16 @@ import {
 } from './query/codexQueries';
 import { buildLoginHint, makeQuotaMeta } from './store/codexStore.helpers';
 import useCodexStore from './store/useCodexStore';
-import { nowText } from './utils';
+import { formatUpdatedAt } from './utils';
+
+type ThemeMode = 'dark' | 'light';
+
+const THEME_STORAGE_KEY = 'codex-channel-theme';
+
+function readInitialTheme(): ThemeMode {
+  const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
+  return saved === 'light' ? 'light' : 'dark';
+}
 
 function App() {
   const {
@@ -43,6 +54,7 @@ function App() {
 
   const startupLoginPromptedRef = useRef(false);
   const lastLoginAuthenticatedRef = useRef(false);
+  const [theme, setTheme] = useState<ThemeMode>(readInitialTheme);
 
   const stateQuery = useChannelStateQuery();
   const historyQuery = useHistoryQuery();
@@ -91,29 +103,16 @@ function App() {
       total: quotaQuery.data.data.totalQuota,
       month: quotaQuery.data.data.monthQuota,
       username: quotaQuery.data.data.username,
-      updatedAt: nowText(),
+      updatedAt: quotaQuery.dataUpdatedAt ? formatUpdatedAt(new Date(quotaQuery.dataUpdatedAt).toISOString()) : '--',
       meta: makeQuotaMeta(quotaQuery.data)
     };
-  }, [quotaQuery.data]);
+  }, [quotaQuery.data, quotaQuery.dataUpdatedAt]);
 
   const isBusy = (key: string): boolean => {
-    if (key === 'refresh') return stateQuery.isFetching;
     if (key === 'history') return historyQuery.isFetching;
     if (key === 'quota') return quotaQuery.isFetching;
     return storeIsBusy(key);
   };
-
-  const refreshState = useCallback(async (): Promise<void> => {
-    setFeedback('正在同步状态...');
-    const result = await stateQuery.refetch();
-
-    if (result.error) {
-      setFeedback('', `读取状态失败: ${result.error.message || String(result.error)}`);
-      return;
-    }
-
-    setFeedback('状态已刷新。', '');
-  }, [setFeedback, stateQuery]);
 
   const refreshHistory = useCallback(async (): Promise<void> => {
     const result = await historyQuery.refetch();
@@ -176,16 +175,40 @@ function App() {
     }
   }, [fetchQuota, loginStateQuery.data, openFoxcodeLogin]);
 
+  useEffect(() => {
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    document.documentElement.style.colorScheme = theme;
+  }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
+  }, []);
+
   return (
-    <div className="app-bg h-screen overflow-hidden text-textMain antialiased">
+    <div className={`theme-root theme-${theme} app-bg h-screen overflow-hidden text-textMain antialiased`}>
       <main className="mx-auto flex h-screen w-full max-w-7xl flex-col px-4 py-4">
         <header className="mb-3 border-b border-border/70 pb-3">
-          <p className="text-[11px] uppercase tracking-[0.24em] text-textSub">Desktop Utility</p>
-          <h1 className="mt-1.5 text-[38px] font-semibold leading-none tracking-tight">codex channel</h1>
-          <p className="mt-1 text-xs text-textSub">仅展示 FoxCode 仪表板额度数据（按量额度 / 月卡额度）。</p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.24em] text-textSub">Desktop Utility</p>
+              <h1 className="mt-1.5 text-[38px] font-semibold leading-none tracking-tight">codex channel</h1>
+              <p className="mt-1 text-xs text-textSub">仅展示 FoxCode 仪表板额度数据（按量额度 / 月卡额度）。</p>
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              className="theme-switch shrink-0"
+              aria-label={theme === 'dark' ? '切换浅色主题' : '切换深色主题'}
+              title={theme === 'dark' ? '切换浅色主题' : '切换深色主题'}
+              onClick={toggleTheme}
+            >
+              {theme === 'dark' ? <SunMedium className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}
+            </Button>
+          </div>
         </header>
 
-        <section className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[332px_minmax(0,1fr)]">
+        <section className="grid min-h-0 flex-1 grid-rows-2 gap-4 pb-2 lg:grid-cols-[332px_minmax(0,1fr)] lg:grid-rows-1 lg:pb-0">
           <ChannelPanel
             state={channelState}
             message={message}
@@ -193,12 +216,11 @@ function App() {
             history={history}
             historyMeta={historyMeta}
             historyExpanded={historyExpanded}
+            theme={theme}
             actionLocked={actionLocked}
             isBusy={isBusy}
             onToggleHistory={() => setHistoryExpanded(!historyExpanded)}
-            onSwitchFox={() => void switchChannel('fox')}
-            onSwitchDefault={() => void switchChannel('default')}
-            onRefreshState={() => void refreshState()}
+            onSwitchChannel={(channel) => void switchChannel(channel)}
             onClearHistory={() => void clearHistory()}
             onRefreshHistory={() => void refreshHistory()}
             onDeleteHistory={(item) => void deleteHistoryOne(item)}

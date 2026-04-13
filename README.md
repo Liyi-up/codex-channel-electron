@@ -1,11 +1,13 @@
 # codex channel
 
-Electron 桌面工具（Electron + React + Vite + React Query + Zustand + Tailwind CSS），提供以下能力：
+Electron 桌面工具（Electron + React + Vite + React Query + Zustand + Tailwind CSS + shadcn/ui + Lucide），提供以下能力：
 
 - 一键切换 Codex 通道（`fox` / `default`）
 - 切换后尝试刷新 Codex 运行态（CLI / App）
 - 一键清理 Codex 历史对话（先备份再清空）
 - 从 `https://foxcode.rjj.cc/dashboard` 读取并展示额度（按量额度 / 月卡额度）
+- 深色 / 浅色主题切换
+- 日志空状态插画展示（按主题自动切换深浅插画）
 
 ## 用户安装与启动
 
@@ -114,6 +116,12 @@ npm run deploy:desktop -- --name "My Codex"
 
 # 自定义名称并自动启动
 npm run deploy:desktop:open -- --name "My Codex"
+
+# 先打包再替换（避免重复打包流程）
+npm run build:deploy:desktop
+
+# 先打包、替换并自动启动
+npm run build:deploy:desktop:open
 ```
 
 这个命令会自动完成：
@@ -130,15 +138,16 @@ npm run deploy:desktop:open -- --name "My Codex"
 
 ## 使用说明
 
-1. 启动后点击通道按钮（`default` 或 `fox`）进行切换。
+1. 在“通道控制”里通过下拉框（`default` / `fox`）切换通道。
 2. 切换后应用会尝试刷新 Codex 运行态（CLI/App）。
-3. 如需清理历史，点击“清理历史”按钮，应用会先备份再清空。
-4. 如需查看 FoxCode 额度，先登录再点击“获取额度”。
+3. 在“历史会话”标题右侧可执行：清空历史 / 刷新历史 / 展开收起。
+4. 清空历史会触发二次确认弹窗（风险提示 + 最终确认）。
+5. 如需查看 FoxCode 额度，先登录再点击“获取额度”。
 
 ## 注意事项
 
 - 切换通道会直接覆盖 `~/.codex/config.toml` 与 `~/.codex/auth.json`。
-- 清理历史会清空：
+- 清理历史会清空（通过“历史会话”标题右侧删除图标触发）：
   - `~/.codex/history.jsonl`
   - `~/.codex/session_index.jsonl`
   - `~/.codex/sessions/`
@@ -178,6 +187,15 @@ npm run dev
 ```bash
 npm start
 ```
+
+## 最近界面更新（2026-04）
+
+- 主题系统：新增深色/浅色主题，支持一键切换并持久化保存。
+- 交互收敛：通道切换从多按钮改为 `Select`，减少操作噪音并保留状态感知。
+- 历史区工具栏：删除/刷新/折叠统一为右侧图标组，尺寸与间距一致。
+- 高风险操作：清空历史动作并入历史区，改为二次确认，降低误触风险。
+- 布局优化：小屏优先一屏展示，大屏日志区填充剩余空间。
+- 空状态体验：运行日志无数据时使用居中插画占位。
 
 ## 目录
 

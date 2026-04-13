@@ -20,6 +20,10 @@
 - React Query
 - Zustand
 - Tailwind CSS
+- shadcn/ui（基础组件模式）
+- Lucide（图标库）
+- classnames + tailwind-merge（类名合并工具）
+- @douyinfe/semi-illustrations（空状态插画）
 - electron-builder
 
 ## 3. 平台假设
@@ -93,12 +97,15 @@ npm run dist:mac
 npm run deploy:desktop
 npm run deploy:desktop:open
 npm run deploy:desktop -- --name "My Codex"
+npm run build:deploy:desktop
+npm run build:deploy:desktop:open
 ```
 
 说明：
 
 - `pack` 生成解包后的 `.app` 目录，适合本地快速验证
 - `deploy:desktop` 会重新打包并覆盖桌面上的目标 `.app`
+- `build:deploy:desktop` 先 `pack` 后替换桌面 `.app`，避免重复打包步骤
 - `--name` 只影响桌面部署名称，不修改项目 `productName`
 
 ## 7. 修改时的优先原则
@@ -166,3 +173,11 @@ npm run deploy:desktop -- --name "My Codex"
 - 图标、应用名称、桌面部署策略虽然已可配置，但还不是完整的产品化发布链路
 
 如果任务需要新增工程规范，优先更新本文件，而不是把说明散落到多个代码注释里。
+
+## 13. UI 实施约定
+
+- 图标操作位（如删除/刷新/折叠）需保持统一的容器尺寸、图标尺寸与间距，仅颜色可区分语义级别。
+- 高风险操作优先“就近收敛”到业务上下文（如历史相关操作放到历史标题区），避免大面积独立危险区打断信息流。
+- 空状态应优先采用“插画/图标 + 说明文案 + 居中布局”，并随主题切换深浅版本。
+- 小屏优先保证“首屏关键操作可达”，必要时使用卡片内滚动，不允许出现难以理解的底部裁切露边。
+- 所有 UI 变更完成后至少执行一次 `npm run build`；涉及桌面验证链路时补充 `npm run build:deploy:desktop`。

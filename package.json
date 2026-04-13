@@ -18,6 +18,8 @@
     "pack": "npm run build && electron-builder --dir",
     "deploy:desktop": "bash ./scripts/deploy-desktop-app.sh",
     "deploy:desktop:open": "bash ./scripts/deploy-desktop-app.sh --open",
+    "build:deploy:desktop": "npm run pack && bash ./scripts/deploy-desktop-app.sh --skip-pack",
+    "build:deploy:desktop:open": "npm run pack && bash ./scripts/deploy-desktop-app.sh --skip-pack --open",
     "dist:mac": "npm run build && electron-builder --mac",
     "dist:win": "npm run build && electron-builder --win",
     "dist:linux": "npm run build && electron-builder --linux",
@@ -85,10 +87,17 @@
     "wait-on": "^9.0.5"
   },
   "dependencies": {
+    "@douyinfe/semi-illustrations": "^2.94.1",
+    "@radix-ui/react-slot": "^1.2.4",
     "@tanstack/react-query": "^5.97.0",
+    "class-variance-authority": "^0.7.1",
+    "classnames": "^2.5.1",
+    "clsx": "^2.1.1",
     "dotenv": "^16.6.1",
+    "lucide-react": "^1.8.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "tailwind-merge": "^3.5.0",
     "zustand": "^5.0.12"
   }
 }

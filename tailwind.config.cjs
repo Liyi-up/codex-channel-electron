@@ -4,10 +4,10 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        panel: '#111318',
-        border: '#2a2f3a',
-        textMain: '#f2f6ff',
-        textSub: '#9aa5be',
+        panel: 'rgb(var(--color-panel) / <alpha-value>)',
+        border: 'rgb(var(--color-border) / <alpha-value>)',
+        textMain: 'rgb(var(--color-text-main) / <alpha-value>)',
+        textSub: 'rgb(var(--color-text-sub) / <alpha-value>)',
         codexBlue: '#3c82f6',
         codexOrange: '#ff9e4a',
         codexDanger: '#ff5d5d',

@@ -28,8 +28,15 @@ async function switchChannelAction(set: SetStore, channel: Channel): Promise<voi
 }
 
 async function clearHistoryAction(set: SetStore): Promise<void> {
-  const ok = window.confirm('确认删除当前 Codex 历史对话吗？系统会先做本地备份。');
-  if (!ok) return;
+  const riskConfirmed = window.confirm(
+    '高风险操作提醒：将清空当前 Codex 历史索引与会话文件，历史列表将不可恢复显示。\n\n系统会先做本地备份，但不保证所有会话都可直接恢复。\n\n是否继续？'
+  );
+  if (!riskConfirmed) return;
+
+  const finalConfirmed = window.confirm(
+    '最终确认：即将执行历史清理。\n\n将清空 history.jsonl / session_index.jsonl / sessions / archived_sessions。\n\n确认执行吗？'
+  );
+  if (!finalConfirmed) return;
 
   set({ actionLocked: true });
   setBusyFlag(set, 'clear', true);

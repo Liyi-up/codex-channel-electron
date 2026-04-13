@@ -1,5 +1,7 @@
+import { LogIn, RefreshCw, Wallet } from 'lucide-react';
 import type { QuotaView } from '../types';
 import ActionButton from './ActionButton';
+import { Card, CardDescription, CardHeader, CardTitle } from './ui/card';
 
 type QuotaPanelProps = {
   envHint: string;
@@ -14,33 +16,40 @@ function QuotaPanel(props: QuotaPanelProps) {
   const { envHint, showFoxLogin, quota, isBusy, onOpenFoxLogin, onFetchQuota } = props;
 
   return (
-    <section className="panel panel-scroll rounded-2xl border border-border/80 p-4">
+    <Card className="panel-scroll h-full min-h-0 p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold">FoxCode 额度</h2>
-          <p className="mt-1 text-xs text-textSub">登录后可获取并展示最新额度数据。</p>
-        </div>
+        <CardHeader className="space-y-1 p-0">
+          <CardTitle className="flex items-center gap-2">
+            <Wallet className="h-4 w-4 text-textSub" />
+            FoxCode 额度
+          </CardTitle>
+          <CardDescription>登录后可获取并展示最新额度数据。</CardDescription>
+        </CardHeader>
         <div className="flex items-center gap-2">
           {showFoxLogin ? (
             <ActionButton
-              className="btn btn-default"
+              variant="default"
+              size="sm"
               label="打开登录页"
               busyText="打开中..."
               loading={isBusy('login')}
+              icon={LogIn}
               onClick={onOpenFoxLogin}
             />
           ) : null}
           <ActionButton
-            className="btn btn-neutral"
+            variant="secondary"
+            size="sm"
             label="获取额度"
             busyText="获取中..."
             loading={isBusy('quota')}
+            icon={RefreshCw}
             onClick={onFetchQuota}
           />
         </div>
       </div>
 
-      <p className="mb-3 rounded-lg border border-border/70 bg-black/25 px-3 py-2 text-xs text-textSub">{envHint}</p>
+      <p className="hint-box mb-3 rounded-lg border border-border/70 px-3 py-2 text-xs text-textSub">{envHint}</p>
 
       <section className="mt-4 grid gap-3 sm:grid-cols-2">
         <article className="quota-card quota-card-total">
@@ -53,7 +62,7 @@ function QuotaPanel(props: QuotaPanelProps) {
         </article>
       </section>
 
-      <section className="mt-4 rounded-xl border border-border/80 bg-black/20 p-3 text-xs text-textSub">
+      <section className="meta-box mt-4 rounded-xl border border-border/80 p-3 text-xs text-textSub">
         <p>
           账号：<span>{quota.username}</span>
         </p>
@@ -62,7 +71,7 @@ function QuotaPanel(props: QuotaPanelProps) {
         </p>
         <p className="mt-1">{quota.meta}</p>
       </section>
-    </section>
+    </Card>
   );
 }
 

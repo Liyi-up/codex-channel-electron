@@ -7,6 +7,7 @@ DEFAULT_PRODUCT_NAME="$(node -p "require('$ROOT_DIR/package.json').build.product
 PRODUCT_APP_NAME="${DEFAULT_PRODUCT_NAME}.app"
 DESKTOP_APP_NAME="$PRODUCT_APP_NAME"
 SHOULD_OPEN="false"
+SHOULD_PACK="true"
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "deploy:desktop 目前仅支持 macOS。" >&2
@@ -27,6 +28,10 @@ while [[ $# -gt 0 ]]; do
       DESKTOP_APP_NAME="${2}.app"
       shift 2
       ;;
+    --skip-pack)
+      SHOULD_PACK="false"
+      shift
+      ;;
     *)
       echo "不支持的参数: $1" >&2
       exit 1
@@ -37,8 +42,12 @@ done
 BUILD_APP_PATH="$ROOT_DIR/release/mac-arm64/$PRODUCT_APP_NAME"
 DESKTOP_APP_PATH="$HOME/Desktop/$DESKTOP_APP_NAME"
 
-echo "Building app package..."
-npm --prefix "$ROOT_DIR" run pack
+if [[ "$SHOULD_PACK" == "true" ]]; then
+  echo "Building app package..."
+  npm --prefix "$ROOT_DIR" run pack
+else
+  echo "Skip pack, using existing build output..."
+fi
 
 if [[ ! -d "$BUILD_APP_PATH" ]]; then
   echo "Build output not found: $BUILD_APP_PATH" >&2
