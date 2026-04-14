@@ -64,50 +64,51 @@ type StatusSnapshot = {
   errorMessage?: string;
 };
 
+function createUnknownHeartbeatPoints(): FoxCodexStatusView['heartbeatPoints'] {
+  return Array.from({ length: 60 }, () => ({
+    tone: 'unknown' as const,
+    time: '-',
+    statusText: '未知'
+  }));
+}
+
+function createFallbackStatusView(
+  options: Pick<FoxCodexStatusView, 'monitorName' | 'latestStatusText' | 'meta'>
+): FoxCodexStatusView {
+  return {
+    moduleName: 'FoxCode',
+    submoduleName: 'FoxCodex 状态',
+    groupName: 'Codex 分组',
+    monitorName: options.monitorName,
+    uptime24hText: '--',
+    latestStatusText: options.latestStatusText,
+    latestCheckedAt: '--',
+    latestCheckedAgoText: '--',
+    heartbeatWindowLabel: '--',
+    heartbeatPoints: createUnknownHeartbeatPoints(),
+    tone: 'unknown' as const,
+    meta: options.meta
+  };
+}
+
 export function buildFoxCodexStatusView(snapshot: StatusSnapshot): FoxCodexStatusView {
   const { result, isPending, isError, errorMessage } = snapshot;
   const data = result?.data;
 
   if (!data) {
     if (isPending) {
-      return {
-        moduleName: 'FoxCode',
-        submoduleName: 'FoxCodex 状态',
-        groupName: 'Codex 分组',
+      return createFallbackStatusView({
         monitorName: '加载中...',
-        uptime24hText: '--',
         latestStatusText: '加载中',
-        latestCheckedAt: '--',
-        latestCheckedAgoText: '--',
-        heartbeatWindowLabel: '--',
-        heartbeatPoints: Array.from({ length: 60 }, () => ({
-          tone: 'unknown' as const,
-          time: '-',
-          statusText: '未知'
-        })),
-        tone: 'unknown' as const,
         meta: '正在拉取状态数据...'
-      };
+      });
     }
 
-    return {
-      moduleName: 'FoxCode',
-      submoduleName: 'FoxCodex 状态',
-      groupName: 'Codex 分组',
+    return createFallbackStatusView({
       monitorName: '--',
-      uptime24hText: '--',
       latestStatusText: '未知',
-      latestCheckedAt: '--',
-      latestCheckedAgoText: '--',
-      heartbeatWindowLabel: '--',
-      heartbeatPoints: Array.from({ length: 60 }, () => ({
-        tone: 'unknown' as const,
-        time: '-',
-        statusText: '未知'
-      })),
-      tone: 'unknown' as const,
       meta: isError ? `状态接口异常: ${errorMessage || '未知错误'}` : result?.message ?? '状态数据暂不可用'
-    };
+    });
   }
 
   const uptime24hText = data.uptime24h === null ? '--' : `${(data.uptime24h * 100).toFixed(2)}%`;

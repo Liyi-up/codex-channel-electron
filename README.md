@@ -92,9 +92,7 @@ pnpm run format:check
 ```bash
 pnpm run build
 pnpm run pack
-pnpm run dist:mac
-pnpm run dist:win
-pnpm run dist:linux
+pnpm run dist
 ```
 
 ### 桌面部署（macOS）
@@ -102,8 +100,7 @@ pnpm run dist:linux
 pnpm run deploy:desktop
 pnpm run deploy:desktop:open
 pnpm run deploy:desktop -- --name "My Codex"
-pnpm run build:deploy:desktop
-pnpm run build:deploy:desktop:open
+pnpm run pack && pnpm run deploy:desktop -- --skip-pack
 ```
 
 ### 提交后自动桌面替换（可选）
@@ -111,7 +108,7 @@ pnpm run build:deploy:desktop:open
 pnpm run hooks:install
 ```
 
-启用后，每次执行 `git commit` 都会自动触发 `pnpm run build:deploy:desktop`。
+启用后，每次执行 `git commit` 都会自动触发 `pnpm run pack && pnpm run deploy:desktop -- --skip-pack`。
 
 如果某次提交想临时跳过自动替换：
 

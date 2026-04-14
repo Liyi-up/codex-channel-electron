@@ -37,7 +37,6 @@ function App() {
     }))
   );
 
-  const startupLoginPromptedRef = useRef(false);
   const lastLoginAuthenticatedRef = useRef(false);
   const { theme, toggleTheme } = useThemeMode();
   const [historyRefreshing, setHistoryRefreshing] = useState(false);
@@ -71,9 +70,24 @@ function App() {
 
     return {
       showFoxLogin: true,
-      envHint: '正在检测登录状态...'
+      envHint: ''
     };
   }, [loginStateQuery.data, loginStateQuery.isError]);
+
+  const quotaExceptionHint = useMemo(() => {
+    if (quotaQuery.isError) {
+      return `额度获取异常：${quotaQuery.error?.message || '未知错误'}`;
+    }
+
+    const quotaResult = quotaQuery.data;
+    if (quotaResult && !quotaResult.ok && !quotaResult.requiresLogin) {
+      return quotaResult.message || '额度获取异常，请稍后重试。';
+    }
+
+    return '';
+  }, [quotaQuery.data, quotaQuery.error?.message, quotaQuery.isError]);
+
+  const quotaPanelHint = quotaExceptionHint || loginHint.envHint;
 
   const quotaView = useMemo(() => buildQuotaView(quotaQuery.data, quotaQuery.dataUpdatedAt), [quotaQuery.data, quotaQuery.dataUpdatedAt]);
 
@@ -94,6 +108,32 @@ function App() {
     if (key === 'foxcode-status') return foxcodeStatusQuery.isFetching;
     return storeIsBusy(key);
   };
+
+  const applyResultFeedback = useCallback(
+    (
+      actionName: string,
+      data: { ok: boolean; message: string } | undefined,
+      options?: { silent?: boolean }
+    ): boolean => {
+      const silent = options?.silent ?? false;
+      if (!data) {
+        if (!silent) {
+          setFeedback('', `${actionName}失败: 未获取到返回结果`);
+        }
+        return false;
+      }
+
+      if (!silent) {
+        if (data.ok) {
+          setFeedback(data.message, '');
+        } else {
+          setFeedback('', data.message);
+        }
+      }
+      return true;
+    },
+    [setFeedback]
+  );
 
   const refreshHistory = useCallback(async (): Promise<void> => {
     if (historyRefreshing) return;
@@ -134,22 +174,9 @@ function App() {
         return;
       }
 
-      if (!result.data) {
-        if (!silent) {
-          setFeedback('', '获取额度失败: 未获取到返回结果');
-        }
-        return;
-      }
-
-      if (!silent) {
-        if (result.data.ok) {
-          setFeedback(result.data.message, '');
-        } else {
-          setFeedback('', result.data.message);
-        }
-      }
+      applyResultFeedback('获取额度', result.data, { silent });
     },
-    [foxcodeStatusQuery, quotaQuery, setFeedback]
+    [applyResultFeedback, foxcodeStatusQuery, quotaQuery, setFeedback]
   );
 
   const refreshFoxCodeStatus = useCallback(async (): Promise<void> => {
@@ -160,18 +187,8 @@ function App() {
       return;
     }
 
-    if (!result.data) {
-      setFeedback('', '刷新状态失败: 未获取到返回结果');
-      return;
-    }
-
-    if (result.data.ok) {
-      setFeedback(result.data.message, '');
-      return;
-    }
-
-    setFeedback('', result.data.message);
-  }, [foxcodeStatusQuery, setFeedback]);
+    applyResultFeedback('刷新状态', result.data);
+  }, [applyResultFeedback, foxcodeStatusQuery, setFeedback]);
 
   useEffect(() => {
     const loginState = loginStateQuery.data;
@@ -182,17 +199,8 @@ function App() {
 
     if (authBecameReady) {
       void fetchQuota(true);
-      return;
     }
-
-    if (loginState.isAuthenticated || startupLoginPromptedRef.current) return;
-    startupLoginPromptedRef.current = true;
-
-    const needLoginNow = window.confirm('检测到未登录 FoxCode，是否现在打开登录页完成登录并自动拉取额度？');
-    if (needLoginNow) {
-      void openFoxCodeLogin();
-    }
-  }, [fetchQuota, loginStateQuery.data, openFoxCodeLogin]);
+  }, [fetchQuota, loginStateQuery.data]);
 
   return (
     <div className={`theme-root theme-${theme} app-bg h-screen overflow-hidden text-textMain antialiased`}>
@@ -231,7 +239,7 @@ function App() {
           />
 
           <QuotaPanel
-            envHint={loginHint.envHint}
+            envHint={quotaPanelHint}
             showFoxLogin={loginHint.showFoxLogin}
             quota={quotaView}
             foxCodexStatus={foxCodexStatusView}

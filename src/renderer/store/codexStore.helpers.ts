@@ -13,14 +13,14 @@ export function buildLoginHint(loginState: FoxCodeLoginState): { envHint: string
   if (loginState.isAuthenticated) {
     return {
       showFoxLogin: false,
-      envHint: '登录状态可用，可直接点击“获取额度”。'
+      envHint: ''
     };
   }
 
   if (loginState.hasCookie) {
     return {
       showFoxLogin: true,
-      envHint: '检测到已有登录信息，但状态失效，请点击“打开登录页”重新登录。'
+      envHint: '检测到登录相关 Cookie，但应用暂未识别为有效登录态。若目标页已登录，请先点击“获取额度”刷新校验，仍失败再重新登录。'
     };
   }
 

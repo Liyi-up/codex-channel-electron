@@ -494,10 +494,7 @@ function archiveSqliteThread(sessionId: string): number {
   ].join(' ');
   const result = runCmd('/usr/bin/sqlite3', [STATE_DB_PATH, updateSql]);
   if (result.status !== 0) return 0;
-  const changes = runCmd('/usr/bin/sqlite3', [STATE_DB_PATH, 'SELECT changes();']);
-  if (changes.status !== 0) return 0;
-  const value = Number(String(changes.stdout ?? '').trim());
-  return Number.isFinite(value) ? value : 0;
+  return readSqliteChanges();
 }
 
 function archiveAllSqliteThreads(): number {
@@ -509,6 +506,10 @@ function archiveAllSqliteThreads(): number {
   ].join(' ');
   const result = runCmd('/usr/bin/sqlite3', [STATE_DB_PATH, updateSql]);
   if (result.status !== 0) return 0;
+  return readSqliteChanges();
+}
+
+function readSqliteChanges(): number {
   const changes = runCmd('/usr/bin/sqlite3', [STATE_DB_PATH, 'SELECT changes();']);
   if (changes.status !== 0) return 0;
   const value = Number(String(changes.stdout ?? '').trim());
@@ -719,8 +720,10 @@ type CapturedApiResponse = {
 };
 
 async function readDashboardSnapshot(win: BrowserWindow): Promise<PageSnapshot> {
+  // 仪表盘 DOM 缺少稳定契约，按“关键词 + 数值”启发式提取；优先取 >0 的最大值，避免误拿到已用额度。
   return win.webContents.executeJavaScript(`(() => {
     const text = (document.body?.innerText || '').replace(/\\u00a0/g, ' ');
+    const loginSelector = 'input[placeholder*="邮箱"], input[type="password"]';
 
     const toNumber = (value) => {
       const n = Number(String(value || '').replace(/,/g, ''));
@@ -728,23 +731,30 @@ async function readDashboardSnapshot(win: BrowserWindow): Promise<PageSnapshot> 
     };
 
     const pickBest = (patterns) => {
-      const candidates = [];
+      let positiveBestRaw = '';
+      let positiveBestValue = Number.NEGATIVE_INFINITY;
+      let fallbackBestRaw = '';
+      let fallbackBestValue = Number.NEGATIVE_INFINITY;
+
       for (const pattern of patterns) {
         for (const match of text.matchAll(pattern)) {
-          const raw = (match && match[1] ? String(match[1]) : '').trim();
+          const raw = String(match[1] ?? '').trim();
           if (!raw) continue;
           const numberValue = toNumber(raw);
           if (Number.isNaN(numberValue)) continue;
-          candidates.push({ raw, numberValue });
+
+          if (numberValue > fallbackBestValue) {
+            fallbackBestValue = numberValue;
+            fallbackBestRaw = raw;
+          }
+
+          if (numberValue > 0 && numberValue > positiveBestValue) {
+            positiveBestValue = numberValue;
+            positiveBestRaw = raw;
+          }
         }
       }
-
-      if (candidates.length === 0) return '';
-
-      const nonZero = candidates.filter((item) => item.numberValue > 0);
-      const pool = nonZero.length > 0 ? nonZero : candidates;
-      pool.sort((a, b) => b.numberValue - a.numberValue);
-      return pool[0] ? pool[0].raw : '';
+      return positiveBestRaw || fallbackBestRaw;
     };
 
     const totalQuota = pickBest([
@@ -759,13 +769,13 @@ async function readDashboardSnapshot(win: BrowserWindow): Promise<PageSnapshot> 
 
     const userMatch = text.match(/欢迎回来[，,]\\s*([^\\n]+)/);
 
-    const onLogin = /登录账户/.test(text) || !!document.querySelector('input[placeholder*="邮箱"], input[type="password"]');
+    const onLogin = /登录账户/.test(text) || !!document.querySelector(loginSelector);
 
     return {
       onLogin,
       totalQuota,
       monthQuota,
-      username: userMatch ? userMatch[1].trim() : ''
+      username: userMatch?.[1]?.trim() ?? ''
     };
   })()`);
 }
@@ -775,10 +785,16 @@ function delay(ms: number): Promise<void> {
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutError: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
   const timeoutPromise = new Promise<T>((_resolve, reject) => {
-    setTimeout(() => reject(new Error(timeoutError)), timeoutMs);
+    timer = setTimeout(() => reject(new Error(timeoutError)), timeoutMs);
   });
-  return Promise.race([promise, timeoutPromise]);
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 async function fetchJsonPayload(url: string): Promise<unknown> {
@@ -864,14 +880,19 @@ function parseFoxCodexHeartbeat(
   payload: unknown,
   monitorId: number
 ): Pick<FoxCodeStatusData, 'uptime24h' | 'latestStatus' | 'latestCheckedAt' | 'heartbeatPoints' | 'heartbeatWindowLabel'> {
+  // 状态页返回结构并非强契约：任何关键层级缺失都回退为“未知占位”，避免单字段异常拖垮整卡片渲染。
   let uptime24h: number | null = null;
   let latestStatus: FoxCodeStatusData['latestStatus'] = 'unknown';
   let latestCheckedAt = '-';
   let heartbeatPoints: FoxCodeStatusData['heartbeatPoints'] = [];
   let heartbeatWindowLabel = '-';
+  const fallback = (): Pick<
+    FoxCodeStatusData,
+    'uptime24h' | 'latestStatus' | 'latestCheckedAt' | 'heartbeatPoints' | 'heartbeatWindowLabel'
+  > => ({ uptime24h, latestStatus, latestCheckedAt, heartbeatPoints, heartbeatWindowLabel });
 
   if (!isRecord(payload)) {
-    return { uptime24h, latestStatus, latestCheckedAt, heartbeatPoints, heartbeatWindowLabel };
+    return fallback();
   }
 
   const uptimeListRaw = payload.uptimeList;
@@ -885,21 +906,20 @@ function parseFoxCodexHeartbeat(
 
   const heartbeatListRaw = payload.heartbeatList;
   if (!isRecord(heartbeatListRaw)) {
-    return { uptime24h, latestStatus, latestCheckedAt, heartbeatPoints, heartbeatWindowLabel };
+    return fallback();
   }
 
   const heartbeatRows = heartbeatListRaw[String(monitorId)];
   if (!Array.isArray(heartbeatRows)) {
-    return { uptime24h, latestStatus, latestCheckedAt, heartbeatPoints, heartbeatWindowLabel };
+    return fallback();
   }
 
   const normalizedRows = heartbeatRows.filter((row): row is Record<string, unknown> => isRecord(row));
   if (normalizedRows.length === 0) {
-    return { uptime24h, latestStatus, latestCheckedAt, heartbeatPoints, heartbeatWindowLabel };
+    return fallback();
   }
 
-  const heartbeatRowsToShow = normalizedRows;
-  heartbeatPoints = heartbeatRowsToShow.map((row) => {
+  heartbeatPoints = normalizedRows.map((row) => {
     const statusValue = toFiniteNumber(row.status);
     const timeValue = typeof row.time === 'string' && row.time.trim() ? row.time.trim() : '-';
     if (statusValue === 1) return { status: 1, time: timeValue };
@@ -1022,7 +1042,7 @@ function getFoxCodeSession() {
 
 function hasFoxCodeAuthCookie(cookies: Electron.Cookie[]): boolean {
   const names = new Set(cookies.map((cookie) => cookie.name.toLowerCase()));
-  return names.has('__cookie_session__') || names.has('auth_user');
+  return names.has('__cookie_session__') || names.has('auth_user') || names.has('auth_token');
 }
 
 async function readFoxCodeLoginState(): Promise<FoxCodeLoginState> {
@@ -1120,6 +1140,7 @@ function pickBestQuotaCandidate(
   value: unknown,
   scope: 'month' | 'total'
 ): QuotaCandidate | null {
+  // 通过字段名语义评分筛选“剩余额度”，排除 used/consume 等消耗类字段，减少误判。
   const normalized = normalizeQuotaValue(value);
   if (!normalized) return current;
 
@@ -1151,6 +1172,7 @@ function pickBestQuotaCandidate(
 }
 
 function findQuotaFromJson(payload: unknown): FoxCodeQuotaData | null {
+  // 采用广度优先扫描，尽量在外层对象先命中额度，避免深层统计字段覆盖更准确结果。
   const queue: unknown[] = [payload];
   const userKey = /(user(name)?|nick(name)?|account|email|name)/i;
   const monthKey = /(month|monthly|month[_-]?quota|card|package|plan|月卡|月度|月额度)/i;
@@ -1174,12 +1196,13 @@ function findQuotaFromJson(payload: unknown): FoxCodeQuotaData | null {
         queue.push(value);
       }
 
-      if (monthKey.test(key)) {
+      const isMonthField = monthKey.test(key);
+      if (isMonthField) {
         monthQuota = pickBestQuotaCandidate(monthQuota, key, value, 'month');
         continue;
       }
 
-      if (totalKey.test(key) && !monthKey.test(key)) {
+      if (totalKey.test(key)) {
         totalQuota = pickBestQuotaCandidate(totalQuota, key, value, 'total');
         continue;
       }
@@ -1232,6 +1255,7 @@ function scoreQuotaResponse(url: string, data: FoxCodeQuotaData): number {
 function parseQuotaFromApiResponses(
   responses: CapturedApiResponse[]
 ): { data: FoxCodeQuotaData; apiEndpoint: string } | null {
+  // 多接口并行返回时，以“URL 语义 + 数值有效性”综合打分，优先取最可信的一条。
   let best: { data: FoxCodeQuotaData; apiEndpoint: string; score: number } | null = null;
 
   for (const response of responses) {
@@ -1239,29 +1263,23 @@ function parseQuotaFromApiResponses(
     const parsed = parseJsonSafe(response.body);
     if (parsed === null) continue;
     const data = findQuotaFromJson(parsed);
-    if (data) {
-      const score = scoreQuotaResponse(response.url, data);
-      if (!best || score > best.score) {
-        best = {
-          data,
-          apiEndpoint: response.url,
-          score
-        };
-      }
+    if (!data) continue;
+
+    const score = scoreQuotaResponse(response.url, data);
+    if (!best || score > best.score) {
+      best = {
+        data,
+        apiEndpoint: response.url,
+        score
+      };
     }
   }
 
-  if (best) {
-    return {
-      data: best.data,
-      apiEndpoint: best.apiEndpoint
-    };
-  }
-
-  return null;
+  return best ? { data: best.data, apiEndpoint: best.apiEndpoint } : null;
 }
 
 async function captureApiResponses(win: BrowserWindow): Promise<CapturedApiResponse[]> {
+  // 仅监听 foxcode 域的 XHR/Fetch；读取 body 失败时跳过该请求，保证流程稳态返回。
   const debug = win.webContents.debugger;
   const pending = new Map<string, { url: string; status: number }>();
   const responses: CapturedApiResponse[] = [];
@@ -1337,7 +1355,27 @@ async function captureApiResponses(win: BrowserWindow): Promise<CapturedApiRespo
   return responses;
 }
 
+function buildQuotaDataFromSnapshot(snapshot: PageSnapshot): FoxCodeQuotaData {
+  return {
+    totalQuota: snapshot.totalQuota || '0',
+    monthQuota: snapshot.monthQuota || '0',
+    username: snapshot.username || '-'
+  };
+}
+
+function createQuotaSuccessResult(data: FoxCodeQuotaData, apiEndpoint?: string): FoxCodeQuotaResult {
+  return {
+    ok: true,
+    requiresLogin: false,
+    hasCookie: true,
+    message: '额度已更新。',
+    ...(apiEndpoint ? { apiEndpoint } : {}),
+    data
+  };
+}
+
 async function fetchFoxCodeQuota(): Promise<FoxCodeQuotaResult> {
+  // 两阶段策略：先走页面快照拿“快路径”；若未拿到有效总额度，再降级抓接口并按评分择优。
   const loginState = await readFoxCodeLoginState();
   if (!loginState.isAuthenticated) {
     return {
@@ -1376,44 +1414,17 @@ async function fetchFoxCodeQuota(): Promise<FoxCodeQuotaResult> {
     }
 
     if (shot.totalQuota && shot.totalQuota !== '0') {
-      return {
-        ok: true,
-        requiresLogin: false,
-        hasCookie: true,
-        message: '额度已更新。',
-        data: {
-          totalQuota: shot.totalQuota,
-          monthQuota: shot.monthQuota || '0',
-          username: shot.username || '-'
-        }
-      };
+      return createQuotaSuccessResult(buildQuotaDataFromSnapshot(shot));
     }
 
     const responses = await withTimeout(captureApiResponses(hiddenWindow), 7000, '额度接口抓取超时');
     const parsedByApi = parseQuotaFromApiResponses(responses);
     if (parsedByApi) {
-      return {
-        ok: true,
-        requiresLogin: false,
-        hasCookie: true,
-        message: '额度已更新。',
-        apiEndpoint: parsedByApi.apiEndpoint,
-        data: parsedByApi.data
-      };
+      return createQuotaSuccessResult(parsedByApi.data, parsedByApi.apiEndpoint);
     }
 
     if (shot.totalQuota) {
-      return {
-        ok: true,
-        requiresLogin: false,
-        hasCookie: true,
-        message: '额度已更新。',
-        data: {
-          totalQuota: shot.totalQuota,
-          monthQuota: shot.monthQuota || '0',
-          username: shot.username || '-'
-        }
-      };
+      return createQuotaSuccessResult(buildQuotaDataFromSnapshot(shot));
     }
 
     return {

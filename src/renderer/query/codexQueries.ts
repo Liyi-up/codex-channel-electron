@@ -40,6 +40,14 @@ export function useFoxCodeQuotaQuery(enabled: boolean) {
       withTimeout(window.codexChannelAPI.fetchFoxCodeQuota(), 12000, '请求超时（12s），请检查网络或重新登录后重试'),
     enabled,
     staleTime: VIEWPORT_AUTO_REFRESH_THROTTLE_MS,
+    // 登录态可用但额度仍为空时，说明可能是瞬时网络/页面抖动，继续短轮询直到拿到有效数据。
+    refetchInterval: (query) => {
+      if (!enabled) return false;
+      const data = query.state.data;
+      if (!data) return 5000;
+      if (!data.ok && !data.requiresLogin) return 10000;
+      return false;
+    },
     refetchOnWindowFocus: true,
     refetchOnReconnect: true
   });

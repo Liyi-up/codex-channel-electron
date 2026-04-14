@@ -1,8 +1,4 @@
-import type { ChannelState, HistoryEntry } from './types';
-
-export function nowText(): string {
-  return new Date().toLocaleString('zh-CN', { hour12: false });
-}
+import type { HistoryEntry } from './types';
 
 export function formatUpdatedAt(value: string): string {
   if (!value || value === '-') return '-';
@@ -16,10 +12,6 @@ export function storageText(storage: HistoryEntry['storage']): string {
   if (storage === 'archived_sessions') return '归档';
   if (storage === 'state_sqlite') return '本地状态';
   return '仅索引';
-}
-
-export function toCurrentText(current: ChannelState['current']): string {
-  return current === 'mixed' ? '混合/未识别' : current;
 }
 
 export async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {

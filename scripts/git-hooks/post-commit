@@ -23,7 +23,7 @@ if ! command -v pnpm >/dev/null 2>&1; then
 fi
 
 echo "[auto-deploy] 检测到 commit，开始打包并替换桌面应用..."
-if pnpm --dir "$ROOT_DIR" run build:deploy:desktop; then
+if pnpm --dir "$ROOT_DIR" run pack && pnpm --dir "$ROOT_DIR" run deploy:desktop -- --skip-pack; then
   echo "[auto-deploy] 桌面应用替换完成。"
 else
   echo "[auto-deploy] 自动桌面部署失败（commit 已完成，不受影响）。" >&2
