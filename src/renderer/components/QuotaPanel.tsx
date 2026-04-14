@@ -37,7 +37,6 @@ function QuotaPanel(props: QuotaPanelProps) {
     <Card className="panel-scroll h-full min-h-0 p-4">
       <CardHeader className="space-y-1 p-0">
         <CardTitle className="text-base">FoxCode</CardTitle>
-        <CardDescription>额度与状态</CardDescription>
       </CardHeader>
 
       <section className="meta-box mt-4 rounded-xl border border-border/80 p-3">
@@ -185,7 +184,7 @@ function QuotaPanel(props: QuotaPanelProps) {
           </div>
 
           <div className="mt-1 flex items-center justify-between text-[11px] text-textSub">
-            <span>窗口 {foxCodexStatus.heartbeatWindowLabel}</span>
+            <span>{foxCodexStatus.heartbeatWindowLabel}</span>
             <span>{foxCodexStatus.latestCheckedAgoText}</span>
           </div>
 
