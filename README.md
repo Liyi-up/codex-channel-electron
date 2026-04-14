@@ -71,12 +71,16 @@ pnpm start
 
 ## 架构概览
 
-- `src/main.ts`：主进程，负责文件系统、进程控制、FoxCode/状态接口抓取、历史与 sqlite 处理、IPC。
+- `src/main.ts`：主进程组合根（Composition Root），负责依赖装配与 Electron 生命周期。
+- `src/main/ipc/registerIpcHandlers.ts`：IPC 注册与参数校验（依赖注入）。
+- `src/main/services/*`：主进程业务服务（通道切换、历史管理、FoxCode 额度与状态）。
+- `src/main/window/createMainWindow.ts`：主窗口创建与加载策略。
 - `src/preload.ts`：桥接层，向渲染进程暴露安全 API。
 - `src/renderer/App.tsx`：页面编排、查询状态聚合与反馈控制。
 - `src/renderer/components/ChannelPanel.tsx`：通道切换与历史会话 UI。
 - `src/renderer/components/QuotaPanel.tsx`：FoxCode 额度 + FoxCodex 状态 UI。
 - `src/renderer/query/codexQueries.ts`：React Query 查询定义（含轮询与重连策略）。
+- `electron.vite.config.ts`：`electron-vite` 构建配置（main/preload/renderer 统一编排）。
 - `scripts/deploy-desktop-app.sh`：桌面应用替换脚本（macOS）。
 
 ## 常用命令
@@ -92,15 +96,12 @@ pnpm run format:check
 
 | 脚本 | 作用 | 是否建议直接运行 |
 |---|---|---|
-| `dev` | 一键启动开发全链路：`dev:main + dev:renderer + dev:electron` | 是（默认入口） |
-| `dev:main` | 仅启动主进程 TypeScript 增量编译（watch） | 按需 |
-| `dev:renderer` | 仅启动渲染进程 Vite 开发服务（`127.0.0.1:5173`） | 按需 |
-| `dev:electron` | 等待 `renderer` 与 `dist/main.js`/`dist/preload.js` 就绪后，使用 nodemon 托管 Electron 进程（主进程构建变更时自动重启） | 一般不单独运行 |
-| `dev:electron:run` | 真正执行 Electron 启动的底层命令，供 `dev:electron` 内部调用 | 否（内部脚本） |
+| `dev` | 使用 `electron-vite` 启动 main/preload/renderer 联动开发（单一入口） | 是（默认入口） |
+| `start` | 先执行生产构建，再通过 `electron-vite preview` 预览产物 | 按需 |
 
 说明：
-- `dev:electron` 与 `dev:electron:run` 不是重复关系，前者是“托管器”（wait + nodemon），后者是“单次启动命令”。
-- 若同时手动运行 `dev` 和 `dev:electron`，会出现多个 Electron 实例（看起来像“双窗口”）。
+- 当前开发链路已统一为 `electron-vite`，不再维护多套 `dev:*` 子脚本。
+- 默认只会有一个 `dev` 入口，减少重复启动导致的双窗口问题。
 
 ### 构建与打包
 ```bash
