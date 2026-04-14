@@ -14,5 +14,5 @@ chmod +x "$HOOKS_DIR"/*
 git -C "$ROOT_DIR" config core.hooksPath scripts/git-hooks
 
 echo "Git hooks 已启用: core.hooksPath=scripts/git-hooks"
-echo "post-commit 将在每次 commit 后自动执行 pack + deploy:desktop -- --skip-pack"
+echo "post-commit 将在每次 commit 后自动执行 pack + deploy-desktop-app.sh --skip-pack"
 echo "如需临时跳过：SKIP_AUTO_DESKTOP_DEPLOY=1 git commit -m \"...\""

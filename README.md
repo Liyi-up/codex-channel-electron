@@ -100,7 +100,7 @@ pnpm run dist
 pnpm run deploy:desktop
 pnpm run deploy:desktop:open
 pnpm run deploy:desktop -- --name "My Codex"
-pnpm run pack && pnpm run deploy:desktop -- --skip-pack
+pnpm run pack && bash ./scripts/deploy-desktop-app.sh --skip-pack
 ```
 
 ### 提交后自动桌面替换（可选）
@@ -108,7 +108,7 @@ pnpm run pack && pnpm run deploy:desktop -- --skip-pack
 pnpm run hooks:install
 ```
 
-启用后，每次执行 `git commit` 都会自动触发 `pnpm run pack && pnpm run deploy:desktop -- --skip-pack`。
+启用后，每次执行 `git commit` 都会自动触发 `pnpm run pack && bash ./scripts/deploy-desktop-app.sh --skip-pack`。
 
 如果某次提交想临时跳过自动替换：
 
