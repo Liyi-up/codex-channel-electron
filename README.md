@@ -88,6 +88,20 @@ pnpm run lint
 pnpm run format:check
 ```
 
+### 开发脚本说明
+
+| 脚本 | 作用 | 是否建议直接运行 |
+|---|---|---|
+| `dev` | 一键启动开发全链路：`dev:main + dev:renderer + dev:electron` | 是（默认入口） |
+| `dev:main` | 仅启动主进程 TypeScript 增量编译（watch） | 按需 |
+| `dev:renderer` | 仅启动渲染进程 Vite 开发服务（`127.0.0.1:5173`） | 按需 |
+| `dev:electron` | 等待 `renderer` 与 `dist/main.js`/`dist/preload.js` 就绪后，使用 nodemon 托管 Electron 进程（主进程构建变更时自动重启） | 一般不单独运行 |
+| `dev:electron:run` | 真正执行 Electron 启动的底层命令，供 `dev:electron` 内部调用 | 否（内部脚本） |
+
+说明：
+- `dev:electron` 与 `dev:electron:run` 不是重复关系，前者是“托管器”（wait + nodemon），后者是“单次启动命令”。
+- 若同时手动运行 `dev` 和 `dev:electron`，会出现多个 Electron 实例（看起来像“双窗口”）。
+
 ### 构建与打包
 ```bash
 pnpm run build
@@ -100,7 +114,7 @@ pnpm run dist
 pnpm run deploy:desktop
 pnpm run deploy:desktop:open
 pnpm run deploy:desktop -- --name "My Codex"
-pnpm run pack && bash ./scripts/deploy-desktop-app.sh --skip-pack
+pnpm run deploy:desktop:silent
 ```
 
 ### 提交后自动桌面替换（可选）
@@ -108,7 +122,7 @@ pnpm run pack && bash ./scripts/deploy-desktop-app.sh --skip-pack
 pnpm run hooks:install
 ```
 
-启用后，每次执行 `git commit` 都会自动触发 `pnpm run pack && bash ./scripts/deploy-desktop-app.sh --skip-pack`。
+启用后，每次执行 `git commit` 都会自动触发 `pnpm run deploy:desktop:silent`（仅替换桌面应用，不重新打包）。
 
 如果某次提交想临时跳过自动替换：
 

@@ -19,6 +19,7 @@
     "pack": "pnpm run build && electron-builder --dir",
     "deploy:desktop": "bash ./scripts/deploy-desktop-app.sh",
     "deploy:desktop:open": "bash ./scripts/deploy-desktop-app.sh --open",
+    "deploy:desktop:silent": "bash ./scripts/deploy-desktop-app.sh --skip-pack",
     "hooks:install": "bash ./scripts/setup-git-hooks.sh",
     "hooks:uninstall": "git config --unset core.hooksPath || true",
     "dist": "pnpm run build && electron-builder --mac",

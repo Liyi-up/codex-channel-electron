@@ -881,6 +881,8 @@ function parseFoxCodexHeartbeat(
   monitorId: number
 ): Pick<FoxCodeStatusData, 'uptime24h' | 'latestStatus' | 'latestCheckedAt' | 'heartbeatPoints' | 'heartbeatWindowLabel'> {
   // 状态页返回结构并非强契约：任何关键层级缺失都回退为“未知占位”，避免单字段异常拖垮整卡片渲染。
+  const MAX_HEARTBEAT_POINTS = 60;
+  const MAX_HEARTBEAT_WINDOW_MINUTES = 5 * 60;
   let uptime24h: number | null = null;
   let latestStatus: FoxCodeStatusData['latestStatus'] = 'unknown';
   let latestCheckedAt = '-';
@@ -919,7 +921,10 @@ function parseFoxCodexHeartbeat(
     return fallback();
   }
 
-  heartbeatPoints = normalizedRows.map((row) => {
+  // 与状态页保持一致：最多展示最近 5h 的点位（60 个），避免为铺满容器扩张时间窗口。
+  const displayRows = normalizedRows.slice(-MAX_HEARTBEAT_POINTS);
+
+  heartbeatPoints = displayRows.map((row) => {
     const statusValue = toFiniteNumber(row.status);
     const timeValue = typeof row.time === 'string' && row.time.trim() ? row.time.trim() : '-';
     if (statusValue === 1) return { status: 1, time: timeValue };
@@ -927,7 +932,7 @@ function parseFoxCodexHeartbeat(
     return { status: -1, time: timeValue };
   });
 
-  const latestRow = normalizedRows[normalizedRows.length - 1];
+  const latestRow = displayRows[displayRows.length - 1];
   const latestCheckedAtRaw = typeof latestRow?.time === 'string' ? latestRow.time.trim() : '';
   latestCheckedAt = latestCheckedAtRaw || '-';
 
@@ -935,14 +940,14 @@ function parseFoxCodexHeartbeat(
   if (latestStatusValue === 1) latestStatus = 'up';
   else if (latestStatusValue === 0) latestStatus = 'down';
 
-  const firstTimestamp = Date.parse(String(normalizedRows[0]?.time ?? ''));
-  const lastTimestamp = Date.parse(String(normalizedRows[normalizedRows.length - 1]?.time ?? ''));
+  const firstTimestamp = Date.parse(String(displayRows[0]?.time ?? ''));
+  const lastTimestamp = Date.parse(String(displayRows[displayRows.length - 1]?.time ?? ''));
 
   let windowMinutes = 0;
   if (!Number.isNaN(firstTimestamp) && !Number.isNaN(lastTimestamp) && lastTimestamp >= firstTimestamp) {
     windowMinutes = Math.max(1, Math.round((lastTimestamp - firstTimestamp) / 60000));
-  } else if (normalizedRows.length >= 2) {
-    const prevTimestamp = Date.parse(String(normalizedRows[normalizedRows.length - 2]?.time ?? ''));
+  } else if (displayRows.length >= 2) {
+    const prevTimestamp = Date.parse(String(displayRows[displayRows.length - 2]?.time ?? ''));
     if (!Number.isNaN(lastTimestamp) && !Number.isNaN(prevTimestamp)) {
       const intervalMinutes = Math.max(1, Math.round(Math.abs(lastTimestamp - prevTimestamp) / 60000));
       windowMinutes = intervalMinutes * heartbeatPoints.length;
@@ -953,7 +958,12 @@ function parseFoxCodexHeartbeat(
     windowMinutes = heartbeatPoints.length * 5;
   }
 
-  if (windowMinutes >= 60) {
+  windowMinutes = Math.min(windowMinutes, MAX_HEARTBEAT_WINDOW_MINUTES);
+
+  const isFullFiveHourWindow = displayRows.length >= MAX_HEARTBEAT_POINTS;
+  if (isFullFiveHourWindow) {
+    heartbeatWindowLabel = '5h';
+  } else if (windowMinutes >= 60) {
     const hours = windowMinutes / 60;
     heartbeatWindowLabel = Number.isInteger(hours) ? `${hours}h` : `${hours.toFixed(1)}h`;
   } else {
